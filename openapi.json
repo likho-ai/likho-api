@@ -1,0 +1,474 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "HealthController_alive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/recordings": {
+      "post": {
+        "description": "Makes the recording and returns the link to PUT the file to.",
+        "operationId": "RecordingsController_requestUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start an upload",
+        "tags": [
+          "recordings"
+        ]
+      },
+      "get": {
+        "description": "Newest first.",
+        "operationId": "RecordingsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "uploading",
+                "uploaded",
+                "ready",
+                "failed",
+                "queued",
+                "transcribing",
+                "done"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "The id of the last recording of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "first",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List recordings",
+        "tags": [
+          "recordings"
+        ]
+      }
+    },
+    "/api/v1/recordings/{id}": {
+      "get": {
+        "operationId": "RecordingsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One recording",
+        "tags": [
+          "recordings"
+        ]
+      },
+      "delete": {
+        "operationId": "RecordingsController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a recording, its audio and its jobs",
+        "tags": [
+          "recordings"
+        ]
+      }
+    },
+    "/api/v1/recordings/{id}/audio": {
+      "get": {
+        "operationId": "RecordingsController_audio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A short-lived link to the audio a browser plays",
+        "tags": [
+          "recordings"
+        ]
+      }
+    },
+    "/api/v1/recordings/{id}/transcript": {
+      "get": {
+        "description": "Every line with both layers: as spoken, and Hinglish.",
+        "operationId": "RecordingsController_transcript",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The newest transcript",
+        "tags": [
+          "recordings"
+        ]
+      }
+    },
+    "/api/v1/recordings/{id}/jobs": {
+      "post": {
+        "operationId": "RecordingsController_createJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Queue a transcription",
+        "tags": [
+          "recordings"
+        ]
+      },
+      "get": {
+        "operationId": "RecordingsController_jobs",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The jobs of a recording, newest first",
+        "tags": [
+          "recordings"
+        ]
+      }
+    },
+    "/api/v1/jobs/{id}": {
+      "get": {
+        "operationId": "JobsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "JobsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stop a waiting or running job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/events/jobs/{id}": {
+      "get": {
+        "operationId": "LiveController_job",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Live"
+        ]
+      }
+    },
+    "/events/recordings": {
+      "get": {
+        "operationId": "LiveController_workspace",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Live"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Likho API",
+    "description": "Recordings, jobs and transcripts for scripts and connectors. Browsers use /graphql.",
+    "version": "1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "The local gateway"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "An API key from the settings page (lk_...)"
+      }
+    },
+    "schemas": {
+      "RequestUploadDto": {
+        "type": "object",
+        "properties": {
+          "originalName": {
+            "type": "string",
+            "example": "call-2026-10-01-0912.mp3"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "example": 105000
+          },
+          "contentType": {
+            "type": "string",
+            "example": "audio/mpeg"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "When known, the same content is not uploaded twice."
+          },
+          "externalId": {
+            "type": "string",
+            "description": "Your own id for the call."
+          }
+        },
+        "required": [
+          "originalName",
+          "sizeBytes"
+        ]
+      },
+      "CreateJobDto": {
+        "type": "object",
+        "properties": {
+          "modelRegistryId": {
+            "type": "string",
+            "description": "Empty = the default model."
+          },
+          "languagePolicy": {
+            "type": "string",
+            "description": "\"auto\" or a language code.",
+            "example": "auto"
+          },
+          "force": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

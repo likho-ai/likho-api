@@ -1,0 +1,475 @@
+/**
+ * Recordings: what was uploaded, where it stands, and the jobs that transcribe it.
+ *
+ * The audio itself is in likho-media; the transcript is in likho-transcription. This service
+ * keeps the list a person sees and moves each recording along as events arrive.
+ */
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { MediaKind } from '@likho-ai/contracts/media/v1/media_pb';
+import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { Clients, fromRpc } from '../clients/clients.module.js';
+import { newId } from '../common/ids.js';
+import { invalid, notFound } from '../common/errors.js';
+import { CONFIG, type Config } from '../config/config.js';
+import { DbService } from '../db/db.module.js';
+import {
+  JOB_STATUSES,
+  jobs,
+  RECORDING_STATUSES,
+  recordings,
+  RecordingStatus,
+  settings,
+} from '../db/schema.js';
+import { BusService, event } from '../bus/bus.service.js';
+import { LiveService } from '../live/live.service.js';
+
+export type RecordingRow = typeof recordings.$inferSelect;
+export type JobRow = typeof jobs.$inferSelect;
+
+export interface UploadRequest {
+  originalName: string;
+  sizeBytes: number;
+  contentType?: string;
+  sha256?: string;
+  source: 'upload' | 'api' | 'dialer';
+  externalId?: string;
+}
+
+export interface UploadAnswer {
+  recording: RecordingRow;
+  /** Where to PUT the file. Empty when the same content is already stored. */
+  uploadUrl: string;
+  expiresAt: Date | null;
+  /** The recording that already holds this content, when there is one. */
+  duplicateOf: RecordingRow | null;
+}
+
+export interface JobRequest {
+  modelRegistryId?: string;
+  languagePolicy?: string;
+  force?: boolean;
+}
+
+const PAGE_LIMIT = 100;
+
+@Injectable()
+export class RecordingsService {
+  private readonly log = new Logger('recordings');
+
+  constructor(
+    @Inject(CONFIG) private readonly config: Config,
+    private readonly dbs: DbService,
+    private readonly clients: Clients,
+    private readonly bus: BusService,
+    private readonly live: LiveService,
+  ) {}
+
+  private get db() {
+    return this.dbs.db;
+  }
+
+  // ---------------------------------------------------------------- uploads
+
+  /** Makes a recording and asks likho-media for the link its file is sent to. */
+  async requestUpload(
+    workspaceId: string,
+    userId: string | null,
+    input: UploadRequest,
+  ): Promise<UploadAnswer> {
+    const originalName = input.originalName.trim();
+    if (!originalName) throw invalid('A file name is required.');
+    if (originalName.length > 255) throw invalid('The file name is too long.');
+    if (!Number.isInteger(input.sizeBytes) || input.sizeBytes < 0)
+      throw invalid('sizeBytes must be a whole number.');
+    if (input.sha256 && !/^[0-9a-f]{64}$/.test(input.sha256))
+      throw invalid('sha256 must be 64 lowercase hex characters.');
+
+    const recordingId = newId('rec');
+    let reply;
+    try {
+      reply = await this.clients.media.createUpload({
+        originalName,
+        sizeBytes: BigInt(input.sizeBytes),
+        contentType: input.contentType ?? '',
+        sha256: input.sha256 ?? '',
+        workspaceId,
+        recordingId,
+      });
+    } catch (error) {
+      throw fromRpc(error, 'media');
+    }
+
+    if (reply.existingMedia) {
+      // The same content is stored already: point at the recording that has it.
+      const [existing] = await this.db
+        .select()
+        .from(recordings)
+        .where(and(eq(recordings.workspaceId, workspaceId), eq(recordings.mediaId, reply.existingMedia.id)));
+      if (existing) {
+        return { recording: existing, uploadUrl: '', expiresAt: null, duplicateOf: existing };
+      }
+    }
+
+    const [recording] = await this.db
+      .insert(recordings)
+      .values({
+        id: recordingId,
+        workspaceId,
+        originalName,
+        mediaId: reply.mediaId,
+        sizeBytes: input.sizeBytes,
+        sha256: input.sha256 ?? '',
+        source: input.source,
+        externalId: input.externalId?.trim() ?? '',
+        status: reply.existingMedia ? 'ready' : 'uploading',
+        createdBy: userId,
+      })
+      .returning();
+    return {
+      recording: recording!,
+      uploadUrl: reply.uploadUrl,
+      expiresAt: reply.expiresAt ? new Date(Number(reply.expiresAt.seconds) * 1000) : null,
+      duplicateOf: null,
+    };
+  }
+
+  // ---------------------------------------------------------------- reading
+
+  async get(workspaceId: string, id: string): Promise<RecordingRow> {
+    const [row] = await this.db
+      .select()
+      .from(recordings)
+      .where(and(eq(recordings.id, id), eq(recordings.workspaceId, workspaceId)));
+    if (!row) throw notFound('The recording');
+    return row;
+  }
+
+  async byMedia(mediaId: string): Promise<RecordingRow | null> {
+    const [row] = await this.db.select().from(recordings).where(eq(recordings.mediaId, mediaId));
+    return row ?? null;
+  }
+
+  /** Newest first. `after` is the id of the last recording of the previous page. */
+  async list(
+    workspaceId: string,
+    filter: { status?: RecordingStatus[]; search?: string; after?: string; limit?: number } = {},
+  ): Promise<{ items: RecordingRow[]; hasMore: boolean }> {
+    const limit = Math.min(Math.max(filter.limit ?? 50, 1), PAGE_LIMIT);
+    const conditions = [eq(recordings.workspaceId, workspaceId)];
+    if (filter.status?.length) {
+      for (const status of filter.status) {
+        if (!RECORDING_STATUSES.includes(status)) throw invalid(`Unknown status ${status}.`);
+      }
+      conditions.push(inArray(recordings.status, filter.status));
+    }
+    if (filter.search?.trim()) {
+      const pattern = `%${filter.search.trim().replace(/[%_\\]/g, '\\$&')}%`;
+      conditions.push(or(ilike(recordings.originalName, pattern), ilike(recordings.externalId, pattern))!);
+    }
+    if (filter.after) {
+      const [cursor] = await this.db
+        .select({ createdAt: recordings.createdAt, id: recordings.id })
+        .from(recordings)
+        .where(and(eq(recordings.id, filter.after), eq(recordings.workspaceId, workspaceId)));
+      if (cursor) {
+        conditions.push(
+          or(
+            lt(recordings.createdAt, cursor.createdAt),
+            and(eq(recordings.createdAt, cursor.createdAt), lt(recordings.id, cursor.id)),
+          )!,
+        );
+      }
+    }
+    const rows = await this.db
+      .select()
+      .from(recordings)
+      .where(and(...conditions))
+      .orderBy(desc(recordings.createdAt), desc(recordings.id))
+      .limit(limit + 1);
+    return { items: rows.slice(0, limit), hasMore: rows.length > limit };
+  }
+
+  async counts(workspaceId: string): Promise<Record<RecordingStatus, number>> {
+    const rows = await this.db
+      .select({ status: recordings.status, count: sql<number>`count(*)::int` })
+      .from(recordings)
+      .where(eq(recordings.workspaceId, workspaceId))
+      .groupBy(recordings.status);
+    const counts = Object.fromEntries(RECORDING_STATUSES.map((status) => [status, 0])) as Record<
+      RecordingStatus,
+      number
+    >;
+    for (const row of rows) counts[row.status] = row.count;
+    return counts;
+  }
+
+  /** A short-lived link to what a browser plays, or to the waveform. */
+  async downloadUrl(recording: RecordingRow, kind: 'audio' | 'peaks' | 'original'): Promise<string> {
+    const kinds = { audio: MediaKind.NORMALIZED, peaks: MediaKind.PEAKS, original: MediaKind.ORIGINAL };
+    try {
+      const reply = await this.clients.media.getDownloadUrl({ id: recording.mediaId, kind: kinds[kind] });
+      return reply.url;
+    } catch (error) {
+      throw fromRpc(error, 'media');
+    }
+  }
+
+  async delete(workspaceId: string, id: string): Promise<void> {
+    const recording = await this.get(workspaceId, id);
+    try {
+      await this.clients.media.deleteMedia({ id: recording.mediaId });
+    } catch (error) {
+      throw fromRpc(error, 'media');
+    }
+    await this.db.delete(recordings).where(eq(recordings.id, id));
+    await this.live.publish({ kind: 'recording', recordingId: id, data: { deleted: true } });
+  }
+
+  // ---------------------------------------------------------------- jobs
+
+  async createJob(
+    workspaceId: string,
+    userId: string | null,
+    recordingId: string,
+    input: JobRequest = {},
+  ): Promise<JobRow> {
+    const recording = await this.get(workspaceId, recordingId);
+    if (!['ready', 'done', 'queued', 'transcribing'].includes(recording.status)) {
+      throw invalid(`The recording cannot be transcribed yet: it is ${recording.status}.`);
+    }
+    const running = await this.db
+      .select({ id: jobs.id })
+      .from(jobs)
+      .where(and(eq(jobs.recordingId, recordingId), inArray(jobs.status, ['queued', 'running'])));
+    if (running.length > 0) throw invalid('A job for this recording is already waiting or running.');
+    return this.queue(recording, userId, input);
+  }
+
+  private async queue(recording: RecordingRow, userId: string | null, input: JobRequest): Promise<JobRow> {
+    const languagePolicy = input.languagePolicy?.trim() || 'auto';
+    if (!/^[a-z]{2,8}$/.test(languagePolicy)) throw invalid('languagePolicy is "auto" or a language code.');
+    const [job] = await this.db
+      .insert(jobs)
+      .values({
+        id: newId('job'),
+        recordingId: recording.id,
+        workspaceId: recording.workspaceId,
+        modelRegistryId: input.modelRegistryId?.trim() ?? '',
+        languagePolicy,
+        force: input.force ?? false,
+        totalSeconds: recording.durationSeconds,
+        createdBy: userId,
+      })
+      .returning();
+    await this.bus.publish(
+      'likho.transcription.requested',
+      event('likho.transcription.requested.v1', recording.id, {
+        job_id: job!.id,
+        recording_id: recording.id,
+        media_id: recording.mediaId,
+        workspace_id: recording.workspaceId,
+        model_registry_id: job!.modelRegistryId,
+        language_policy: job!.languagePolicy,
+        force: job!.force,
+      }),
+    );
+    await this.setRecordingStatus(recording.id, 'queued');
+    await this.live.publish({
+      kind: 'job',
+      jobId: job!.id,
+      recordingId: recording.id,
+      data: { status: 'queued' },
+    });
+    this.log.log(`job ${job!.id} queued for recording ${recording.id}`);
+    return job!;
+  }
+
+  async getJob(workspaceId: string, id: string): Promise<JobRow> {
+    const [row] = await this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.id, id), eq(jobs.workspaceId, workspaceId)));
+    if (!row) throw notFound('The job');
+    return row;
+  }
+
+  async listJobs(workspaceId: string, recordingId?: string, status?: JobRow['status'][]): Promise<JobRow[]> {
+    const conditions = [eq(jobs.workspaceId, workspaceId)];
+    if (recordingId) conditions.push(eq(jobs.recordingId, recordingId));
+    if (status?.length) {
+      for (const s of status) if (!JOB_STATUSES.includes(s)) throw invalid(`Unknown job status ${s}.`);
+      conditions.push(inArray(jobs.status, status));
+    }
+    return this.db
+      .select()
+      .from(jobs)
+      .where(and(...conditions))
+      .orderBy(desc(jobs.createdAt))
+      .limit(PAGE_LIMIT);
+  }
+
+  async cancelJob(workspaceId: string, id: string): Promise<JobRow> {
+    const job = await this.getJob(workspaceId, id);
+    if (job.status !== 'queued' && job.status !== 'running') return job;
+    // A running job is stopped by its worker; a queued one may be taken before the worker learns.
+    try {
+      await this.clients.transcription.cancelJob({ jobId: id });
+    } catch (error) {
+      this.log.warn(`could not ask the worker to stop job ${id}: ${String(error)}`);
+    }
+    const [updated] = await this.db
+      .update(jobs)
+      .set({ status: 'cancelled', finishedAt: new Date() })
+      .where(eq(jobs.id, id))
+      .returning();
+    await this.setRecordingStatus(job.recordingId, 'ready');
+    await this.live.publish({
+      kind: 'job',
+      jobId: id,
+      recordingId: job.recordingId,
+      data: { status: 'cancelled' },
+    });
+    return updated!;
+  }
+
+  // ---------------------------------------------------------------- what the events do
+
+  async setRecordingStatus(
+    id: string,
+    status: RecordingStatus,
+    extra: Partial<RecordingRow> = {},
+  ): Promise<void> {
+    await this.db
+      .update(recordings)
+      .set({ status, updatedAt: new Date(), ...extra })
+      .where(eq(recordings.id, id));
+    await this.live.publish({ kind: 'recording', recordingId: id, data: { status, ...extra } });
+  }
+
+  /** likho.media.ready: the file is audio. Queue a job when the workspace wants that. */
+  async onMediaReady(
+    mediaId: string,
+    info: { durationSeconds: number; channels: number; sampleRate: number },
+  ): Promise<void> {
+    const recording = await this.byMedia(mediaId);
+    if (!recording) {
+      this.log.warn(`media ${mediaId} is ready but no recording has it`);
+      return;
+    }
+    if (recording.status !== 'uploading' && recording.status !== 'uploaded') return; // seen before
+    await this.setRecordingStatus(recording.id, 'ready', info);
+    if (await this.autoTranscribe(recording.workspaceId)) {
+      await this.queue({ ...recording, ...info, status: 'ready' }, null, {});
+    }
+  }
+
+  async onMediaFailed(mediaId: string, message: string): Promise<void> {
+    const recording = await this.byMedia(mediaId);
+    if (!recording) return;
+    await this.setRecordingStatus(recording.id, 'failed', { failureReason: message });
+  }
+
+  async onJobStarted(jobId: string, totalSeconds: number): Promise<void> {
+    const [job] = await this.db
+      .update(jobs)
+      .set({ status: 'running', startedAt: new Date(), totalSeconds })
+      .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued')))
+      .returning();
+    if (!job) return;
+    await this.setRecordingStatus(job.recordingId, 'transcribing');
+    await this.live.publish({
+      kind: 'job',
+      jobId,
+      recordingId: job.recordingId,
+      data: { status: 'running', totalSeconds },
+    });
+  }
+
+  async onJobProgress(jobId: string, progressSeconds: number, totalSeconds: number): Promise<void> {
+    await this.db
+      .update(jobs)
+      .set({
+        progressSeconds,
+        totalSeconds,
+        status: 'running',
+        startedAt: sql`coalesce(${jobs.startedAt}, now())`,
+      })
+      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running'])));
+  }
+
+  async onJobCompleted(
+    jobId: string,
+    result: {
+      transcriptId: string;
+      detectedLanguage: string;
+      languageProbability: number;
+      audioSeconds: number;
+    },
+  ): Promise<void> {
+    const [job] = await this.db
+      .update(jobs)
+      .set({
+        status: 'done',
+        finishedAt: new Date(),
+        transcriptId: result.transcriptId,
+        progressSeconds: result.audioSeconds,
+        totalSeconds: result.audioSeconds,
+      })
+      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running', 'cancelled'])))
+      .returning();
+    if (!job) return;
+    await this.setRecordingStatus(job.recordingId, 'done', {
+      latestTranscriptId: result.transcriptId,
+      detectedLanguage: result.detectedLanguage,
+      languageProbability: result.languageProbability,
+      durationSeconds: result.audioSeconds,
+    });
+    await this.live.publish({
+      kind: 'job',
+      jobId,
+      recordingId: job.recordingId,
+      data: { status: 'done', transcriptId: result.transcriptId },
+    });
+  }
+
+  async onJobFailed(jobId: string, code: string, message: string): Promise<void> {
+    const status = code === 'cancelled' ? 'cancelled' : 'failed';
+    const [job] = await this.db
+      .update(jobs)
+      .set({ status, finishedAt: new Date(), errorCode: code, errorMessage: message })
+      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running'])))
+      .returning();
+    if (!job) return;
+    const [recording] = await this.db.select().from(recordings).where(eq(recordings.id, job.recordingId));
+    if (recording && (recording.status === 'queued' || recording.status === 'transcribing')) {
+      // Back to where it was: a transcript from an earlier job still counts.
+      await this.setRecordingStatus(job.recordingId, recording.latestTranscriptId ? 'done' : 'ready');
+    }
+    await this.live.publish({
+      kind: 'job',
+      jobId,
+      recordingId: job.recordingId,
+      data: { status, code, message },
+    });
+  }
+
+  // ---------------------------------------------------------------- settings
+
+  async autoTranscribe(workspaceId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ value: settings.value })
+      .from(settings)
+      .where(and(eq(settings.workspaceId, workspaceId), eq(settings.key, 'auto_transcribe')));
+    return row ? row.value === true : true;
+  }
+
+  async setAutoTranscribe(workspaceId: string, enabled: boolean): Promise<void> {
+    await this.db
+      .insert(settings)
+      .values({ workspaceId, key: 'auto_transcribe', value: enabled })
+      .onConflictDoUpdate({
+        target: [settings.workspaceId, settings.key],
+        set: { value: enabled, updatedAt: new Date() },
+      });
+  }
+}

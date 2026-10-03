@@ -1,0 +1,325 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type ApiKey {
+  createdAt: DateTime!
+  id: String!
+  lastUsedAt: DateTime
+  name: String!
+  revokedAt: DateTime
+}
+
+input CreateJobInput {
+  """Transcribe again even if a transcript exists."""
+  force: Boolean
+
+  """"auto" or a language code to force."""
+  languagePolicy: String
+
+  """Empty = the default model."""
+  modelRegistryId: String
+  recordingId: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Engine {
+  available: Boolean!
+  engine: String!
+  isDefault: Boolean!
+  registryId: String!
+}
+
+type GlossaryTerm {
+  enabled: Boolean!
+  id: String!
+  language: String!
+  note: String!
+  term: String!
+}
+
+input GlossaryTermInput {
+  enabled: Boolean
+
+  """Empty: a new term, or the one with the same text."""
+  id: String
+  language: String
+  note: String
+  term: String!
+}
+
+type Job {
+  createdAt: DateTime!
+  errorCode: String!
+  errorMessage: String!
+  finishedAt: DateTime
+  force: Boolean!
+  id: String!
+  languagePolicy: String!
+  modelRegistryId: String!
+  progressSeconds: Float!
+  recordingId: String!
+  startedAt: DateTime
+  status: JobStatus!
+  totalSeconds: Float!
+  transcriptId: String!
+}
+
+enum JobStatus {
+  cancelled
+  done
+  failed
+  queued
+  running
+}
+
+type LanguageCandidate {
+  language: String!
+  probability: Float!
+}
+
+type LanguageDetection {
+  candidates: [LanguageCandidate!]!
+  decodedAs: String!
+  detected: String!
+  policy: String!
+  probability: Float!
+}
+
+type Me {
+  email: String!
+  id: String
+  name: String!
+  role: String!
+  workspace: Workspace!
+}
+
+type Mutation {
+  """Stops a waiting or running job."""
+  cancelJob(id: String!): Job!
+
+  """Makes a key for scripts and connectors."""
+  createApiKey(name: String!): NewApiKey!
+
+  """Queues a transcription of a recording."""
+  createJob(input: CreateJobInput!): Job!
+  deleteGlossaryTerm(id: String!): Boolean!
+
+  """Removes the recording, its audio and its jobs."""
+  deleteRecording(id: String!): Boolean!
+  deleteSpelling(id: String!): Boolean!
+
+  """Signs in and sets the session cookie."""
+  login(email: String!, password: String!): Me!
+
+  """Ends the session and clears the cookie."""
+  logout: Boolean!
+
+  """
+  Starts an upload: makes the recording and returns where to PUT the file.
+  """
+  requestUpload(input: RequestUploadInput!): UploadTicket!
+
+  """
+  A new version whose Hinglish is rebuilt with the current spellings. The speech model does not run.
+  """
+  retransliterate(transcriptId: String!): Transcript!
+  revokeApiKey(id: String!): Boolean!
+  updateSettings(autoTranscribe: Boolean!): Settings!
+  upsertGlossaryTerm(input: GlossaryTermInput!): GlossaryTerm!
+  upsertSpelling(input: SpellingInput!): Spelling!
+}
+
+type NewApiKey {
+  id: String!
+
+  """Shown once. Send it as "Authorization: Bearer <key>"."""
+  key: String!
+}
+
+type Query {
+  apiKeys: [ApiKey!]!
+
+  """The speech models a worker can run."""
+  engines: [Engine!]!
+  glossary: [GlossaryTerm!]!
+  job(id: String!): Job!
+
+  """Jobs of the workspace, newest first."""
+  jobs(recordingId: String, status: [JobStatus!]): [Job!]!
+
+  """Who is signed in, and their workspace."""
+  me: Me!
+  recording(id: String!): Recording!
+
+  """How many recordings are in each state."""
+  recordingCounts: RecordingCounts!
+
+  """The workspace’s recordings, newest first."""
+  recordings(after: String, filter: RecordingFilter, first: Int): RecordingPage!
+  settings: Settings!
+  spellings: [Spelling!]!
+
+  """One transcript with every line, both layers."""
+  transcript(id: String!): Transcript!
+
+  """
+  Every version of a recording’s transcript, newest first, without lines.
+  """
+  transcriptVersions(recordingId: String!): [Transcript!]!
+}
+
+type Recording {
+  channels: Int!
+  createdAt: DateTime!
+  detectedLanguage: String!
+  durationSeconds: Float!
+  externalId: String!
+  failureReason: String!
+  id: String!
+
+  """The jobs of this recording, newest first."""
+  jobs: [Job!]!
+  languageProbability: Float!
+
+  """The newest transcript, with every line."""
+  latestTranscript: Transcript
+  latestTranscriptId: String!
+  mediaId: String!
+  originalName: String!
+
+  """A short-lived link to the waveform (JSON)."""
+  peaksUrl: String
+
+  """A short-lived link to the audio a browser plays."""
+  playbackUrl: String
+  sampleRate: Int!
+  sha256: String!
+  sizeBytes: Float!
+  source: String!
+  status: RecordingStatus!
+  updatedAt: DateTime!
+}
+
+type RecordingCounts {
+  done: Int!
+  failed: Int!
+  queued: Int!
+  ready: Int!
+  transcribing: Int!
+  uploaded: Int!
+  uploading: Int!
+}
+
+input RecordingFilter {
+  """Part of the file name or the external id."""
+  search: String
+  status: [RecordingStatus!]
+}
+
+type RecordingPage {
+  """Pass as `after` to get the next page."""
+  endCursor: String
+  hasMore: Boolean!
+  items: [Recording!]!
+}
+
+enum RecordingStatus {
+  done
+  failed
+  queued
+  ready
+  transcribing
+  uploaded
+  uploading
+}
+
+input RequestUploadInput {
+  contentType: String
+
+  """Your own id for the call."""
+  externalId: String
+  originalName: String!
+
+  """When known: the same content is not uploaded twice."""
+  sha256: String
+  sizeBytes: Float!
+}
+
+type Segment {
+  endSeconds: Float!
+  index: Int!
+  startSeconds: Float!
+
+  """Layer 2: Hinglish."""
+  textRoman: String!
+
+  """Layer 1: as spoken, in the script of the language."""
+  textScript: String!
+}
+
+type Settings {
+  """Queue a job as soon as a recording is ready."""
+  autoTranscribe: Boolean!
+}
+
+type Spelling {
+  enabled: Boolean!
+  id: String!
+  isPhrase: Boolean!
+
+  """What the model writes, in the source script."""
+  source: String!
+
+  """How it must appear in Hinglish."""
+  target: String!
+}
+
+input SpellingInput {
+  enabled: Boolean
+  id: String
+  source: String!
+  target: String!
+}
+
+type Transcript {
+  compute: String!
+  createdAt: DateTime
+  engine: String!
+  id: String!
+  jobId: String!
+  language: LanguageDetection!
+  modelRegistryId: String!
+  recordingId: String!
+  script: String!
+  segments: [Segment!]!
+  stats: TranscriptStats!
+  version: Int!
+}
+
+type TranscriptStats {
+  audioSeconds: Float!
+  chunks: Int!
+  elapsedSeconds: Float!
+  realtimeFactor: Float!
+  silenceSkippedSeconds: Float!
+}
+
+type UploadTicket {
+  """The recording that already holds this content."""
+  duplicateOf: Recording
+  expiresAt: DateTime
+  recording: Recording!
+
+  """PUT the file here. Empty when the same content is already stored."""
+  uploadUrl: String!
+}
+
+type Workspace {
+  id: String!
+  name: String!
+}
