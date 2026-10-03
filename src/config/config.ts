@@ -1,8 +1,9 @@
 /**
- * Settings, read from environment variables. The defaults match the likho-infra local stack,
- * so nothing has to be set on a developer's machine.
+ * Settings, read from environment variables and .env files. The defaults match the likho-infra
+ * local stack, so nothing has to be set on a developer's machine.
  */
 import { z } from 'zod';
+import { withEnvFiles } from './env-files.js';
 
 const port = z.coerce.number().int().min(0).max(65535);
 const seconds = z.coerce.number().int().min(1);
@@ -10,7 +11,7 @@ const seconds = z.coerce.number().int().min(1);
 export const DEV_SESSION_SECRET = 'likho-dev-session-secret';
 
 const schema = z.object({
-  LIKHO_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  LIKHO_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   HTTP_PORT: port.default(4000),
 
@@ -25,7 +26,7 @@ const schema = z.object({
 
   /** The address browsers use. Cookies are marked Secure when it is https. */
   PUBLIC_ORIGIN: z.string().default('http://localhost:8080'),
-  /** Signs nothing yet, but lets a session store be rotated later. Must be set in production. */
+  /** Keys sessions and API keys. Must be set in staging and production. */
   SESSION_SECRET: z.string().min(16).default(DEV_SESSION_SECRET),
   SESSION_DAYS: seconds.default(30),
 
@@ -46,15 +47,21 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema>;
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = schema.safeParse(env);
+/**
+ * Reads the settings from the environment and the .env files of LIKHO_ENV (see env-files.ts).
+ * Tests pass an environment of their own, in which case no file is read.
+ */
+export function loadConfig(env?: NodeJS.ProcessEnv): Config {
+  const source = env ?? withEnvFiles().env;
+  const parsed = schema.safeParse(source);
   if (!parsed.success) {
     const problems = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
     throw new Error(`configuration: ${problems.join('; ')}`);
   }
   const config = parsed.data;
-  if (config.LIKHO_ENV === 'production' && config.SESSION_SECRET === DEV_SESSION_SECRET) {
-    throw new Error('configuration: SESSION_SECRET must be set in production');
+  const real = config.LIKHO_ENV === 'staging' || config.LIKHO_ENV === 'production';
+  if (real && config.SESSION_SECRET === DEV_SESSION_SECRET) {
+    throw new Error(`configuration: SESSION_SECRET must be set in ${config.LIKHO_ENV}`);
   }
   if ((config.BOOTSTRAP_ADMIN_EMAIL === undefined) !== (config.BOOTSTRAP_ADMIN_PASSWORD === undefined)) {
     throw new Error('configuration: BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD go together');

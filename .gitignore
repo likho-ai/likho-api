@@ -1,6 +1,10 @@
 node_modules/
 dist/
-.env
 coverage/
 *.log
 *.tsbuildinfo
+
+# Personal and secret settings on this machine; never committed.
+.env
+.env.local
+.env.*.local

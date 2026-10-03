@@ -55,10 +55,11 @@ fail with `service_unavailable` until then).
 
 ```bash
 pnpm install
-BOOTSTRAP_ADMIN_EMAIL=you@example.com BOOTSTRAP_ADMIN_PASSWORD=choose-one pnpm start:dev
+pnpm start:dev        # reads .env.development: the local stack, and a first admin (see below)
 ```
 
-The first start with `BOOTSTRAP_ADMIN_*` set creates the admin and a workspace. More users:
+The first start creates the admin and workspace named in `BOOTSTRAP_ADMIN_*` (in
+`.env.development`: `admin@example.com` / `admin-password-1`, for your machine only). More users:
 
 ```bash
 pnpm build
@@ -125,6 +126,19 @@ with the codes `unauthenticated`, `forbidden`, `not_found`, `invalid`, `conflict
 `service_unavailable`; GraphQL carries the same code in `extensions.code`.
 
 ## Configuration
+
+Settings come from environment variables and from `.env` files chosen by `LIKHO_ENV`
+(`development` by default). The files are read in this order, each overriding the one before,
+and a real environment variable wins over all of them:
+
+```
+.env   .env.local   .env.<LIKHO_ENV>   .env.<LIKHO_ENV>.local
+```
+
+`.env.development`, `.env.staging` and `.env.production` are committed and hold no secrets.
+`.env.<env>.local` holds the secrets of that environment on your machine; git ignores it, and
+`likho-infra/scripts/make-env-secrets.py` makes it. In Kubernetes the same values come from
+ConfigMaps and Secrets.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
