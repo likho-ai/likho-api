@@ -49,9 +49,11 @@ export function appModule(config?: Config) {
       GraphQLModule.forRoot<ApolloDriverConfig>({
         driver: ApolloDriver,
         path: '/graphql',
-        // Written on every start outside production, so the committed file is always current.
-        autoSchemaFile:
-          (config ?? loadConfig()).LIKHO_ENV === 'production' ? true : join(process.cwd(), 'schema.graphql'),
+        // Written on every development and test start, so the committed file is always current.
+        // Staging and production run from a read-only image: the schema stays in memory there.
+        autoSchemaFile: ['development', 'test'].includes((config ?? loadConfig()).LIKHO_ENV)
+          ? join(process.cwd(), 'schema.graphql')
+          : true,
         sortSchema: true,
         context: ({ req, res }: { req: unknown; res: unknown }) => ({ req, res }),
         formatError: formatGraphQLError,
