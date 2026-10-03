@@ -10,6 +10,19 @@ type ApiKey {
   revokedAt: DateTime
 }
 
+"""
+A fact about the call from where it came: campaign, agent, disposition, ...
+"""
+type Attribute {
+  key: String!
+  value: String!
+}
+
+input AttributeInput {
+  key: String!
+  value: String!
+}
+
 input CreateJobInput {
   """Transcribe again even if a transcript exists."""
   force: Boolean
@@ -50,6 +63,39 @@ input GlossaryTermInput {
   language: String
   note: String
   term: String!
+}
+
+type Import {
+  """not_found, no_recording, unavailable, rejected or error."""
+  code: String!
+  createdAt: DateTime!
+
+  """The call’s id in that system."""
+  externalId: String!
+  id: String!
+
+  """Why it failed, for a person."""
+  reason: String!
+
+  """The recording, once the call is stored."""
+  recordingId: String!
+
+  """Which connector: ameyo."""
+  source: String!
+  status: ImportStatus!
+  transcribe: Boolean!
+  updatedAt: DateTime!
+}
+
+type ImportPage {
+  hasMore: Boolean!
+  items: [Import!]!
+}
+
+enum ImportStatus {
+  completed
+  failed
+  requested
 }
 
 type Job {
@@ -120,6 +166,11 @@ type Mutation {
   logout: Boolean!
 
   """
+  Asks the dialer connector for a call by its id; the recording appears when it arrives.
+  """
+  requestImport(input: RequestImportInput!): Import!
+
+  """
   Starts an upload: makes the recording and returns where to PUT the file.
   """
   requestUpload(input: RequestUploadInput!): UploadTicket!
@@ -147,6 +198,10 @@ type Query {
   """The speech models a worker can run."""
   engines: [Engine!]!
   glossary: [GlossaryTerm!]!
+  import(id: String!): Import!
+
+  """Calls asked for from the dialer, newest first."""
+  imports(after: String, first: Int, status: [ImportStatus!]): ImportPage!
   job(id: String!): Job!
 
   """Jobs of the workspace, newest first."""
@@ -161,6 +216,11 @@ type Query {
 
   """The workspace’s recordings, newest first."""
   recordings(after: String, filter: RecordingFilter, first: Int): RecordingPage!
+
+  """
+  Transcript lines matching a few words, in either layer, typos allowed; best first.
+  """
+  search(filter: SearchFilter, page: Int, pageSize: Int, query: String!): SearchPage!
   settings: Settings!
   spellings: [Spelling!]!
 
@@ -174,6 +234,8 @@ type Query {
 }
 
 type Recording {
+  """Facts about the call from where it came."""
+  attributes: [Attribute!]!
   channels: Int!
   createdAt: DateTime!
   detectedLanguage: String!
@@ -238,7 +300,20 @@ enum RecordingStatus {
   uploading
 }
 
+input RequestImportInput {
+  """The call’s id in the dialer (its crt_object_id)."""
+  externalId: String!
+
+  """Which connector; empty = the default one."""
+  source: String
+
+  """Transcribe once stored (default true)."""
+  transcribe: Boolean
+}
+
 input RequestUploadInput {
+  """Facts about the call: campaign, agent, ..."""
+  attributes: [AttributeInput!]
   contentType: String
 
   """Your own id for the call."""
@@ -248,6 +323,52 @@ input RequestUploadInput {
   """When known: the same content is not uploaded twice."""
   sha256: String
   sizeBytes: Float!
+
+  """Where the call comes from (a connector’s name); API keys only."""
+  source: String
+}
+
+input SearchFilter {
+  """A detected language (ISO 639-1)."""
+  language: String
+
+  """Only this recording."""
+  recordingId: String
+
+  """Transcripts created from this moment."""
+  since: DateTime
+
+  """Transcripts created up to this moment."""
+  until: DateTime
+}
+
+type SearchHit {
+  endSeconds: Float!
+
+  """The Hinglish line with every match inside <mark>…</mark>."""
+  highlightRoman: String!
+
+  """The script line with every match inside <mark>…</mark>."""
+  highlightScript: String!
+  language: String!
+
+  """The recording the line is from."""
+  recording: Recording!
+  segmentIndex: Int!
+  startSeconds: Float!
+  textRoman: String!
+  textScript: String!
+  transcriptId: String!
+}
+
+type SearchPage {
+  hits: [SearchHit!]!
+  page: Int!
+  pageSize: Int!
+  processingMs: Int!
+
+  """Lines matched in all."""
+  total: Int!
 }
 
 type Segment {

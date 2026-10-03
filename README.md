@@ -15,11 +15,21 @@ browser ── GraphQL /graphql ──┐
 script  ── REST    /api/v1 ───┤── likho-api ──┬── likho-media         (upload links, playback links, delete)
 browser ── SSE     /events ───┘               ├── likho-transcription (transcripts, cancel, engines)
                                               ├── likho-language      (glossary, spellings)
+                                              ├── likho-search        (lines matching a few words)
                    events on NATS ────────────┤   likho.media.ready / failed
                                               │   likho.live.segment
                                               │   likho.transcription.completed / failed
+                                              │   likho.import.completed / failed   (a connector answers)
                    publishes ─────────────────┘   likho.transcription.requested
+                                                  likho.import.requested             (fetch this call from the dialer)
+                                                  likho.recording.deleted
 ```
+
+Beyond uploads: **search** (`search(query)` / `GET /api/v1/search?q=` - every transcript line,
+either layer, typos allowed, matches marked, each hit with its recording) and **imports**
+(`requestImport(externalId)` / `POST /api/v1/imports` - a call asked for by its id in the
+dialer; the connector fetches it and the recording appears, with `source` and `attributes`
+such as campaign, agent, disposition and call time, which a connector sets when it uploads).
 
 A recording's life, as the API sees it:
 
@@ -146,7 +156,8 @@ ConfigMaps and Secrets.
 | `DATABASE_URL` | local stack, database `likho_api` | PostgreSQL; tables are created on start |
 | `REDIS_URL` | `redis://localhost:6380` | Live updates between instances |
 | `NATS_URL` | `nats://localhost:4222` | Event bus |
-| `MEDIA_GRPC_ADDR`, `TRANSCRIPTION_GRPC_ADDR`, `LANGUAGE_GRPC_ADDR` | `localhost:5010/5020/5030` | The other services |
+| `MEDIA_GRPC_ADDR`, `TRANSCRIPTION_GRPC_ADDR`, `LANGUAGE_GRPC_ADDR`, `SEARCH_GRPC_ADDR` | `localhost:5010/5020/5030/5040` | The other services |
+| `IMPORT_SOURCE` | `ameyo` | The connector that answers `requestImport` by default; empty = imports are off |
 | `PUBLIC_ORIGIN` | `http://localhost:8080` | The address browsers use; https makes cookies Secure |
 | `SESSION_SECRET` | a development value | Keys sessions and API keys; required in production |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts |

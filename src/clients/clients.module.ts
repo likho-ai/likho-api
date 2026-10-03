@@ -7,6 +7,7 @@ import { Client, Code, ConnectError, createClient } from '@connectrpc/connect';
 import { createGrpcTransport } from '@connectrpc/connect-node';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaService } from '@likho-ai/contracts/media/v1/media_pb';
+import { SearchService } from '@likho-ai/contracts/search/v1/search_pb';
 import { TranscriptionService } from '@likho-ai/contracts/transcription/v1/transcription_pb';
 import { LikhoError } from '../common/errors.js';
 import { CONFIG, type Config } from '../config/config.js';
@@ -14,12 +15,14 @@ import { CONFIG, type Config } from '../config/config.js';
 export type MediaClient = Client<typeof MediaService>;
 export type TranscriptionClient = Client<typeof TranscriptionService>;
 export type LanguageClient = Client<typeof LanguageService>;
+export type SearchClient = Client<typeof SearchService>;
 
 @Injectable()
 export class Clients {
   readonly media: MediaClient;
   readonly transcription: TranscriptionClient;
   readonly language: LanguageClient;
+  readonly search: SearchClient;
 
   constructor(@Inject(CONFIG) config: Config) {
     const transport = (address: string) =>
@@ -30,6 +33,7 @@ export class Clients {
     this.media = createClient(MediaService, transport(config.MEDIA_GRPC_ADDR));
     this.transcription = createClient(TranscriptionService, transport(config.TRANSCRIPTION_GRPC_ADDR));
     this.language = createClient(LanguageService, transport(config.LANGUAGE_GRPC_ADDR));
+    this.search = createClient(SearchService, transport(config.SEARCH_GRPC_ADDR));
   }
 }
 

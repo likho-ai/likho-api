@@ -4,6 +4,7 @@
  *   likho.media.ready / failed            the file is audio, or not
  *   likho.live.segment                    a line was transcribed (to the browsers, and progress)
  *   likho.transcription.completed/failed  a job ended
+ *   likho.import.completed/failed         the connector fetched a call, or could not
  *
  * Every event is applied once: ids are remembered, so a redelivery changes nothing twice.
  */
@@ -13,6 +14,7 @@ import { BusService, CloudEvent } from '../bus/bus.service.js';
 import { CONFIG, type Config } from '../config/config.js';
 import { DbService } from '../db/db.module.js';
 import { handledEvents, jobs } from '../db/schema.js';
+import { ImportsService } from '../imports/imports.service.js';
 import { LiveService } from '../live/live.service.js';
 import { RecordingsService } from './recordings.service.js';
 
@@ -28,6 +30,7 @@ export class EventsConsumer implements OnModuleInit {
     private readonly bus: BusService,
     private readonly dbs: DbService,
     private readonly recordings: RecordingsService,
+    private readonly imports: ImportsService,
     private readonly live: LiveService,
   ) {}
 
@@ -70,6 +73,26 @@ export class EventsConsumer implements OnModuleInit {
       subject: 'likho.transcription.failed',
       handler: this.once((data) =>
         this.recordings.onJobFailed(data.job_id, String(data.code), String(data.message ?? '')),
+      ),
+    });
+    await this.bus.consume({
+      stream: 'LIKHO',
+      durable: 'import-completed',
+      subject: 'likho.import.completed',
+      handler: this.once((data) =>
+        this.imports.onCompleted(String(data.request_id), String(data.recording_id)),
+      ),
+    });
+    await this.bus.consume({
+      stream: 'LIKHO',
+      durable: 'import-failed',
+      subject: 'likho.import.failed',
+      handler: this.once((data) =>
+        this.imports.onFailed(
+          String(data.request_id),
+          String(data.code ?? 'error'),
+          String(data.reason ?? ''),
+        ),
       ),
     });
     // Live lines are only useful now: no need to catch up on old ones.

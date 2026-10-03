@@ -9,6 +9,7 @@ import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { Script } from '@likho-ai/contracts/common/v1/common_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
+import { HitSchema, SearchService, type Hit } from '@likho-ai/contracts/search/v1/search_pb';
 import {
   TranscriptSchema,
   TranscriptionService,
@@ -176,6 +177,51 @@ export class FakeLanguage {
       },
       deleteSpelling: (req) => {
         if (!this.spellings.delete(req.id)) throw new ConnectError('not found', Code.NotFound);
+        return {};
+      },
+    });
+  }
+}
+
+/** likho-search: answers every search with the hits a test put in, and remembers what it was asked. */
+export class FakeSearch {
+  hits: Omit<Partial<Hit>, '$typeName'>[] = [];
+  asked: {
+    workspaceId: string;
+    query: string;
+    language: string;
+    recordingId: string;
+    page: number;
+    pageSize: number;
+  }[] = [];
+  reindexed: string[] = [];
+  deleted: string[] = [];
+
+  routes(router: ConnectRouter) {
+    router.service(SearchService, {
+      search: (req) => {
+        this.asked.push({
+          workspaceId: req.workspaceId,
+          query: req.query,
+          language: req.language,
+          recordingId: req.recordingId,
+          page: req.page,
+          pageSize: req.pageSize,
+        });
+        return {
+          hits: this.hits.map((hit) => create(HitSchema, hit)),
+          page: req.page || 1,
+          pageSize: req.pageSize || 20,
+          total: this.hits.length,
+          processingMs: 2,
+        };
+      },
+      reindex: (req) => {
+        this.reindexed.push(req.transcriptId);
+        return { lines: 2 };
+      },
+      deleteRecording: (req) => {
+        this.deleted.push(req.recordingId);
         return {};
       },
     });

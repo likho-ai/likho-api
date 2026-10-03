@@ -32,6 +32,23 @@ export class Job {
   @Field(() => Date, { nullable: true }) finishedAt: Date | null;
 }
 
+@ObjectType({ description: 'A fact about the call from where it came: campaign, agent, disposition, ...' })
+export class Attribute {
+  @Field() key: string;
+  @Field() value: string;
+}
+
+@InputType()
+export class AttributeInput {
+  @Field() key: string;
+  @Field() value: string;
+}
+
+/** The stored map, as a list a client can show. */
+export function attributeList(attributes: Record<string, string> | null | undefined): Attribute[] {
+  return Object.entries(attributes ?? {}).map(([key, value]) => ({ key, value }));
+}
+
 @ObjectType()
 export class Recording {
   @Field() id: string;
@@ -44,6 +61,7 @@ export class Recording {
   @Field(() => Int) sampleRate: number;
   @Field() source: string;
   @Field() externalId: string;
+  // attributes is resolved from the stored map (see the resolver).
   @Field(() => RecordingStatusEnum) status: keyof typeof RecordingStatusEnum;
   @Field() failureReason: string;
   @Field() latestTranscriptId: string;
@@ -91,6 +109,13 @@ export class RequestUploadInput {
   @Field({ nullable: true, description: 'When known: the same content is not uploaded twice.' })
   sha256?: string;
   @Field({ nullable: true, description: 'Your own id for the call.' }) externalId?: string;
+  @Field({ nullable: true, description: 'Where the call comes from (a connector’s name); API keys only.' })
+  source?: string;
+  @Field(() => [AttributeInput], {
+    nullable: true,
+    description: 'Facts about the call: campaign, agent, ...',
+  })
+  attributes?: AttributeInput[];
 }
 
 @InputType()

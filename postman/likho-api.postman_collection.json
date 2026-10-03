@@ -1,7 +1,7 @@
 {
   "item": [
     {
-      "id": "0463bfb6-7cf1-4a65-869c-e583a2e1736b",
+      "id": "24127e70-598d-4225-99dd-0732c23bfa1e",
       "name": "Health",
       "description": {
         "content": "",
@@ -9,7 +9,7 @@
       },
       "item": [
         {
-          "id": "bcad77bb-c850-468c-aeb4-0787c2ce336b",
+          "id": "a4c2fd51-8029-4a97-a135-da09d579729c",
           "name": "Health Controller alive",
           "request": {
             "name": "Health Controller alive",
@@ -29,7 +29,7 @@
           },
           "response": [
             {
-              "id": "635ec6c2-f54e-403d-8ec5-f596930bb99f",
+              "id": "99905c85-6f16-4c79-82fc-26c210760564",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -63,7 +63,7 @@
           }
         },
         {
-          "id": "b56949ee-2885-4a1f-afd5-44c151675cff",
+          "id": "34d2c6e8-babe-4124-be36-ef382835970f",
           "name": "Health Controller ready",
           "request": {
             "name": "Health Controller ready",
@@ -83,7 +83,7 @@
           },
           "response": [
             {
-              "id": "8970a235-eb70-4460-b1fd-f8d721f3d7b9",
+              "id": "2fba83ad-ab3d-4a08-aeb8-a00709d6ce47",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -120,7 +120,7 @@
       "event": []
     },
     {
-      "id": "03b7fae3-10d4-4b8a-ac4e-c1b50586ea30",
+      "id": "ba2f8aaa-705b-4ae1-99b0-7cdffa4d2ad5",
       "name": "recordings",
       "description": {
         "content": "",
@@ -128,7 +128,7 @@
       },
       "item": [
         {
-          "id": "f080633c-b48d-4967-9193-99b33b576a0e",
+          "id": "19604741-c596-4f3a-a082-3241ca4f0eba",
           "name": "Start an upload",
           "request": {
             "name": "Start an upload",
@@ -166,7 +166,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"originalName\": \"<string>\",\n  \"sizeBytes\": \"<number>\",\n  \"contentType\": \"<string>\",\n  \"sha256\": \"<string>\",\n  \"externalId\": \"<string>\"\n}",
+              "raw": "{\n  \"originalName\": \"<string>\",\n  \"sizeBytes\": \"<number>\",\n  \"contentType\": \"<string>\",\n  \"sha256\": \"<string>\",\n  \"externalId\": \"<string>\",\n  \"source\": \"<string>\",\n  \"attributes\": \"<object>\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -176,7 +176,7 @@
           },
           "response": [
             {
-              "id": "6012123d-efc9-4a1a-841a-8bbd3e1ce644",
+              "id": "afe9c9ca-c48f-4da2-813e-8a58078d9fff",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -203,7 +203,7 @@
                 "method": "POST",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"originalName\": \"call-2026-10-01-0912.mp3\",\n  \"sizeBytes\": 105000,\n  \"contentType\": \"audio/mpeg\",\n  \"sha256\": \"<string>\",\n  \"externalId\": \"<string>\"\n}",
+                  "raw": "{\n  \"originalName\": \"call-2026-10-01-0912.mp3\",\n  \"sizeBytes\": 105000,\n  \"contentType\": \"audio/mpeg\",\n  \"sha256\": \"<string>\",\n  \"externalId\": \"<string>\",\n  \"source\": \"ameyo\",\n  \"attributes\": {\n    \"campaign\": \"inbound\",\n    \"agent\": \"agent-12\",\n    \"disposition\": \"sale\"\n  }\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -230,7 +230,7 @@
           }
         },
         {
-          "id": "91316f4c-5e9e-4036-822c-7c1812109671",
+          "id": "44f50bf1-3081-4771-931b-bf2979b4b6d1",
           "name": "List recordings",
           "request": {
             "name": "List recordings",
@@ -285,7 +285,7 @@
           },
           "response": [
             {
-              "id": "0ccc82a5-aa62-407b-95e7-662bf4ea7ca6",
+              "id": "70c1656c-e3a1-42be-b760-13c7f3229956",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -348,7 +348,7 @@
           }
         },
         {
-          "id": "fc3c0dee-ac81-468f-9dc4-728d7acc8930",
+          "id": "f367023a-74b1-432b-ba55-74da7bab2c97",
           "name": "One recording",
           "request": {
             "name": "One recording",
@@ -387,7 +387,7 @@
           },
           "response": [
             {
-              "id": "87357ccc-92b8-43fb-87f2-1bbd47010dc3",
+              "id": "b1141994-1d53-4243-ada7-1c92ba76d494",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -442,7 +442,7 @@
           }
         },
         {
-          "id": "865d2276-1b48-4c9d-bb69-11cab9d9c12c",
+          "id": "2c308f77-efec-4b72-96ba-a126d1f99450",
           "name": "Delete a recording, its audio and its jobs",
           "request": {
             "name": "Delete a recording, its audio and its jobs",
@@ -481,7 +481,7 @@
           },
           "response": [
             {
-              "id": "1131e933-2751-48e2-b602-b98f5fa3e694",
+              "id": "dfc84788-0e17-42e6-9d4d-a3869ff127d0",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -536,7 +536,7 @@
           }
         },
         {
-          "id": "d94f4e77-cc75-4850-b5e1-29544badd361",
+          "id": "a005b1f7-fb20-4a25-9973-ebc2a1fb1190",
           "name": "A short-lived link to the audio a browser plays",
           "request": {
             "name": "A short-lived link to the audio a browser plays",
@@ -576,7 +576,7 @@
           },
           "response": [
             {
-              "id": "b3f7246b-812b-4d57-8390-9f4706e0b4e9",
+              "id": "9184de0f-c54f-4e82-90e8-95cf60eed0ac",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -632,7 +632,7 @@
           }
         },
         {
-          "id": "04a5bb9a-fc9e-44d3-bea5-5405e9729b27",
+          "id": "4faa6e52-b7b0-43f3-ae6f-85788a046989",
           "name": "The newest transcript",
           "request": {
             "name": "The newest transcript",
@@ -675,7 +675,7 @@
           },
           "response": [
             {
-              "id": "77a3f70d-4f93-41f8-ad91-30b19d56b972",
+              "id": "a74272ba-63fc-4bb1-a43d-6d79647a6014",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -731,7 +731,7 @@
           }
         },
         {
-          "id": "0c05799f-b04a-4026-b362-aed2f9a46950",
+          "id": "48b90793-f3e6-4258-8417-d5feb154c2ef",
           "name": "Queue a transcription",
           "request": {
             "name": "Queue a transcription",
@@ -786,7 +786,7 @@
           },
           "response": [
             {
-              "id": "a9c407d3-3eb7-4480-8a50-190cbb809372",
+              "id": "cc1fac81-cdb4-48fc-9452-73316a529319",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -850,7 +850,7 @@
           }
         },
         {
-          "id": "12ebcbdf-dcfa-4a98-9d2f-a346cf78c5fc",
+          "id": "beb37328-e173-4704-b5b1-d0558e5a658a",
           "name": "The jobs of a recording, newest first",
           "request": {
             "name": "The jobs of a recording, newest first",
@@ -890,7 +890,7 @@
           },
           "response": [
             {
-              "id": "37367838-6569-4eb8-ad14-031cc64f9fe2",
+              "id": "2eff4623-08df-497a-8f8c-426e254020bb",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -949,7 +949,7 @@
       "event": []
     },
     {
-      "id": "20a21771-e2bf-454c-821d-b840917884b8",
+      "id": "762c0716-dcec-44e3-98e2-9c79c99cb771",
       "name": "jobs",
       "description": {
         "content": "",
@@ -957,7 +957,7 @@
       },
       "item": [
         {
-          "id": "5187bd67-da30-4a04-ac90-892a92d97cf1",
+          "id": "6b7c16da-f0d6-42c3-8565-ad3c005b0554",
           "name": "One job",
           "request": {
             "name": "One job",
@@ -996,7 +996,7 @@
           },
           "response": [
             {
-              "id": "5d5f57f1-b828-4a9d-b48c-e369d33984b9",
+              "id": "95ee3e05-8024-44d2-948a-0ab6061a7d66",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1051,7 +1051,7 @@
           }
         },
         {
-          "id": "d635dbcd-5578-4cc4-b508-904d3f8b2fbc",
+          "id": "442e7d74-e965-4813-9569-ee0d375377c6",
           "name": "Stop a waiting or running job",
           "request": {
             "name": "Stop a waiting or running job",
@@ -1091,7 +1091,7 @@
           },
           "response": [
             {
-              "id": "fd38fad2-f56c-4fe8-abb1-04c489974585",
+              "id": "c4731fcb-9851-4827-983c-3fdb365a538b",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1150,7 +1150,483 @@
       "event": []
     },
     {
-      "id": "984fe418-ead5-4dda-9080-a21c05308a84",
+      "id": "fceafd55-92e5-4014-bf73-52f47e381aec",
+      "name": "search",
+      "description": {
+        "content": "",
+        "type": "text/plain"
+      },
+      "item": [
+        {
+          "id": "3d65a8e5-b8ac-4629-a145-afdd9fd04818",
+          "name": "Search every transcript line",
+          "request": {
+            "name": "Search every transcript line",
+            "description": {
+              "content": "A few words in either layer, typos allowed; the matches are inside <mark>…</mark>.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "search"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [
+                {
+                  "disabled": false,
+                  "key": "q",
+                  "value": "<string>",
+                  "description": "(Required) A few words, in either layer; typos allowed."
+                },
+                {
+                  "disabled": false,
+                  "key": "language",
+                  "value": "<string>",
+                  "description": "A detected language (ISO 639-1)."
+                },
+                {
+                  "disabled": false,
+                  "key": "recordingId",
+                  "value": "<string>",
+                  "description": "Only this recording."
+                },
+                {
+                  "disabled": false,
+                  "key": "since",
+                  "value": "<string>",
+                  "description": "Transcripts created from this moment (ISO 8601)."
+                },
+                {
+                  "disabled": false,
+                  "key": "until",
+                  "value": "<string>",
+                  "description": "Transcripts created up to this moment (ISO 8601)."
+                },
+                {
+                  "disabled": false,
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "disabled": false,
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "fbb9468d-a534-43ce-86dd-d4649e9a8342",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "search"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "order confirm"
+                    },
+                    {
+                      "key": "language",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "recordingId",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "since",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "until",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "20"
+                    }
+                  ],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        }
+      ],
+      "event": []
+    },
+    {
+      "id": "53534031-3f36-46ac-8a79-36783191bdbb",
+      "name": "imports",
+      "description": {
+        "content": "",
+        "type": "text/plain"
+      },
+      "item": [
+        {
+          "id": "b9b775b2-0961-4055-98fe-febb692dd648",
+          "name": "Fetch a call from the dialer by its id",
+          "request": {
+            "name": "Fetch a call from the dialer by its id",
+            "description": {
+              "content": "The connector fetches the call; poll the import, or the recordings, to see it arrive.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "imports"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"externalId\": \"<string>\",\n  \"source\": \"<string>\",\n  \"transcribe\": \"<boolean>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "id": "7a422473-98ea-4436-841c-9f68e552e10d",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "imports"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"externalId\": \"d000-0a1b2c3d-vce-0001\",\n  \"source\": \"<string>\",\n  \"transcribe\": \"<boolean>\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        },
+        {
+          "id": "40526111-bc00-4e97-8e45-f88fad45bd19",
+          "name": "List imports",
+          "request": {
+            "name": "List imports",
+            "description": {
+              "content": "Newest first.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "imports"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [
+                {
+                  "disabled": false,
+                  "key": "status",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "after",
+                  "value": "<string>",
+                  "description": "The id of the last import of the previous page."
+                },
+                {
+                  "disabled": false,
+                  "key": "first",
+                  "value": "50"
+                }
+              ],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "81683674-c3f4-428a-b0fe-74575dc77402",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "imports"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "after",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "first",
+                      "value": "50"
+                    }
+                  ],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        },
+        {
+          "id": "8474a117-8507-4a20-a9ba-f2b589a2b17c",
+          "name": "One import",
+          "request": {
+            "name": "One import",
+            "description": {},
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "imports",
+                ":id"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "disabled": false,
+                  "type": "any",
+                  "value": "<string>",
+                  "key": "id",
+                  "description": "(Required) "
+                }
+              ]
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "a428fb8c-2bc2-4fc2-90a3-a4a97b47f175",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "imports",
+                    ":id"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [],
+                  "variable": [
+                    {
+                      "disabled": false,
+                      "type": "any",
+                      "value": "<string>",
+                      "key": "id",
+                      "description": "(Required) "
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        }
+      ],
+      "event": []
+    },
+    {
+      "id": "d2258c31-86f6-4374-a41c-ba2208d40cdf",
       "name": "Live",
       "description": {
         "content": "",
@@ -1158,7 +1634,7 @@
       },
       "item": [
         {
-          "id": "022e1bd4-e5f6-4558-aae4-27dab12e5916",
+          "id": "383bb135-18fa-4b61-905c-1cae31dc10d4",
           "name": "Live Controller job",
           "request": {
             "name": "Live Controller job",
@@ -1188,7 +1664,7 @@
           },
           "response": [
             {
-              "id": "5f1df132-702a-4f38-8d03-ff33cd496119",
+              "id": "77fa393a-ea75-405b-b577-66cc942e6592",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1232,7 +1708,7 @@
           }
         },
         {
-          "id": "853771de-9ee9-4293-b9fe-122ef0eda27d",
+          "id": "7268aa3a-628f-4af4-a68a-e74568de4686",
           "name": "Live Controller workspace",
           "request": {
             "name": "Live Controller workspace",
@@ -1253,7 +1729,7 @@
           },
           "response": [
             {
-              "id": "56d5b332-3c25-4e49-93e3-ec5771f7e9bf",
+              "id": "2f503ae3-366a-4d43-923a-8d293d281e93",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1300,7 +1776,7 @@
     }
   ],
   "info": {
-    "_postman_id": "a2cee079-1b22-4038-a2f8-1813984f1ae3",
+    "_postman_id": "1e8b4423-9e02-452d-90af-e9e226f290a7",
     "name": "Likho API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": {

@@ -4,11 +4,30 @@
  */
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { CurrentUser } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Clients, fromRpc } from '../clients/clients.module.js';
-import { RECORDING_STATUSES, type RecordingStatus } from '../db/schema.js';
+import { invalid } from '../common/errors.js';
+import {
+  IMPORT_STATUSES,
+  type ImportStatus,
+  RECORDING_STATUSES,
+  type RecordingStatus,
+} from '../db/schema.js';
+import { type ImportRow, ImportsService } from '../imports/imports.service.js';
+import { SearchService } from '../search/search.service.js';
 import { type JobRow, type RecordingRow, RecordingsService } from '../recordings/recordings.service.js';
 import { transcriptFromPb } from '../transcripts/transcripts.graphql.js';
 
@@ -25,7 +44,84 @@ export class RequestUploadDto {
   @IsString()
   @MaxLength(200)
   externalId?: string;
+  @ApiPropertyOptional({
+    description: 'Where the call comes from: a connector’s name, e.g. ameyo.',
+    example: 'ameyo',
+  })
+  @IsOptional()
+  @Matches(/^[a-z][a-z0-9_-]{0,31}$/)
+  source?: string;
+  @ApiPropertyOptional({
+    description: 'Facts about the call: campaign, agent, disposition, call time, ...',
+    example: { campaign: 'inbound', agent: 'agent-12', disposition: 'sale' },
+  })
+  @IsOptional()
+  @IsObject()
+  attributes?: Record<string, string>;
 }
+
+export class SearchQueryDto {
+  @ApiProperty({ description: 'A few words, in either layer; typos allowed.', example: 'order confirm' })
+  @IsString()
+  @MaxLength(200)
+  q: string;
+  @ApiPropertyOptional({ description: 'A detected language (ISO 639-1).' })
+  @IsOptional()
+  @IsString()
+  language?: string;
+  @ApiPropertyOptional({ description: 'Only this recording.' })
+  @IsOptional()
+  @IsString()
+  recordingId?: string;
+  @ApiPropertyOptional({ description: 'Transcripts created from this moment (ISO 8601).' })
+  @IsOptional()
+  @IsString()
+  since?: string;
+  @ApiPropertyOptional({ description: 'Transcripts created up to this moment (ISO 8601).' })
+  @IsOptional()
+  @IsString()
+  until?: string;
+  @ApiPropertyOptional({ default: 1 }) @IsOptional() @IsInt() @Min(1) page?: number;
+  @ApiPropertyOptional({ default: 20, maximum: 100 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+export class RequestImportDto {
+  @ApiProperty({
+    description: 'The call’s id in the dialer (its crt_object_id).',
+    example: 'd000-0a1b2c3d-vce-0001',
+  })
+  @IsString()
+  @MaxLength(200)
+  externalId: string;
+  @ApiPropertyOptional({ description: 'Which connector; empty = the default one.' })
+  @IsOptional()
+  @IsString()
+  source?: string;
+  @ApiPropertyOptional({ description: 'Transcribe once stored (default true).' })
+  @IsOptional()
+  @IsBoolean()
+  transcribe?: boolean;
+}
+
+export class ListImportsQuery {
+  @ApiPropertyOptional({ enum: IMPORT_STATUSES }) @IsOptional() @IsIn(IMPORT_STATUSES) status?: ImportStatus;
+  @ApiPropertyOptional({ description: 'The id of the last import of the previous page.' })
+  @IsOptional()
+  @IsString()
+  after?: string;
+  @ApiPropertyOptional({ default: 50 }) @IsOptional() @IsInt() @Min(1) first?: number;
+}
+
+const importJson = (i: ImportRow) => ({
+  ...i,
+  createdAt: i.createdAt.toISOString(),
+  updatedAt: i.updatedAt.toISOString(),
+});
 
 export class CreateJobDto {
   @ApiPropertyOptional({ description: 'Empty = the default model.' })
@@ -79,9 +175,10 @@ export class RecordingsController {
     description: 'Makes the recording and returns the link to PUT the file to.',
   })
   async requestUpload(@CurrentUser() me: Principal, @Body() body: RequestUploadDto) {
+    const { source, ...rest } = body;
     const answer = await this.recordings.requestUpload(me.workspaceId, me.userId, {
-      ...body,
-      source: me.kind === 'api_key' ? 'api' : 'upload',
+      ...rest,
+      source: me.kind === 'api_key' ? source || 'api' : 'upload',
     });
     return {
       recording: recordingJson(answer.recording),
@@ -173,5 +270,73 @@ export class JobsController {
   @ApiOperation({ summary: 'Stop a waiting or running job' })
   async cancel(@CurrentUser() me: Principal, @Param('id') id: string) {
     return jobJson(await this.recordings.cancelJob(me.workspaceId, id));
+  }
+}
+
+const parseMoment = (value: string | undefined, name: string): Date | undefined => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw invalid(`${name} must be a date and time (ISO 8601).`);
+  return date;
+};
+
+@ApiTags('search')
+@ApiBearerAuth()
+@Controller('api/v1/search')
+export class SearchController {
+  constructor(private readonly search: SearchService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Search every transcript line',
+    description: 'A few words in either layer, typos allowed; the matches are inside <mark>…</mark>.',
+  })
+  async find(@CurrentUser() me: Principal, @Query() query: SearchQueryDto) {
+    const page = await this.search.search(me.workspaceId, {
+      query: query.q,
+      language: query.language,
+      recordingId: query.recordingId,
+      since: parseMoment(query.since, 'since'),
+      until: parseMoment(query.until, 'until'),
+      page: query.page,
+      pageSize: query.pageSize,
+    });
+    return {
+      ...page,
+      hits: page.hits.map((hit) => ({ ...hit, recording: recordingJson(hit.recording) })),
+    };
+  }
+}
+
+@ApiTags('imports')
+@ApiBearerAuth()
+@Controller('api/v1/imports')
+export class ImportsController {
+  constructor(private readonly imports: ImportsService) {}
+
+  @Post()
+  @ApiOperation({
+    summary: 'Fetch a call from the dialer by its id',
+    description: 'The connector fetches the call; poll the import, or the recordings, to see it arrive.',
+  })
+  async request(@CurrentUser() me: Principal, @Body() body: RequestImportDto) {
+    return importJson(await this.imports.request(me.workspaceId, me.userId, body));
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List imports', description: 'Newest first.' })
+  async list(@CurrentUser() me: Principal, @Query() query: ListImportsQuery) {
+    const page = await this.imports.list(me.workspaceId, {
+      status: query.status ? [query.status] : undefined,
+      after: query.after,
+      limit: query.first,
+    });
+    return { items: page.items.map(importJson), hasMore: page.hasMore };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'One import' })
+  async get(@CurrentUser() me: Principal, @Param('id') id: string) {
+    return importJson(await this.imports.get(me.workspaceId, id));
   }
 }

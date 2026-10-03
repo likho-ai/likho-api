@@ -12,9 +12,11 @@ import { CONFIG, type Config } from '../config/config.js';
 
 export interface LiveUpdate {
   /** 'segment' (a transcribed line), 'job' (status or progress), 'recording' (status). */
-  kind: 'segment' | 'job' | 'recording';
+  kind: 'segment' | 'job' | 'recording' | 'import';
   jobId?: string;
   recordingId: string;
+  /** For updates that are not about one recording yet (an import): whose they are. */
+  workspaceId?: string;
   data: Record<string, unknown>;
 }
 

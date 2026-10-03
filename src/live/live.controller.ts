@@ -80,6 +80,10 @@ export class LiveController {
       const subscription = this.live
         .watch(() => true)
         .subscribe((update) => {
+          if (update.kind === 'import') {
+            if (update.workspaceId === me.workspaceId) observer.next(sent(update));
+            return;
+          }
           void belongs(update.recordingId).then((ok) => ok && observer.next(sent(update)));
         });
       return () => subscription.unsubscribe();

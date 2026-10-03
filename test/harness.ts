@@ -13,7 +13,7 @@ import pg from 'pg';
 import { createApp } from '../src/app.js';
 import { newId } from '../src/common/ids.js';
 import { Config, loadConfig } from '../src/config/config.js';
-import { FakeLanguage, FakeMedia, FakeServer, FakeTranscription, serve } from './fakes.js';
+import { FakeLanguage, FakeMedia, FakeSearch, FakeServer, FakeTranscription, serve } from './fakes.js';
 
 const codec = StringCodec();
 
@@ -24,6 +24,7 @@ export interface Harness {
   media: FakeMedia;
   transcription: FakeTranscription;
   language: FakeLanguage;
+  search: FakeSearch;
   nats: NatsConnection;
   js: JetStreamClient;
   /** Publishes an event the way the other services do. Returns its id. */
@@ -84,10 +85,12 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
   const media = new FakeMedia();
   const transcription = new FakeTranscription();
   const language = new FakeLanguage();
+  const search = new FakeSearch();
   const servers: FakeServer[] = await Promise.all([
     serve((r) => media.routes(r)),
     serve((r) => transcription.routes(r)),
     serve((r) => language.routes(r)),
+    serve((r) => search.routes(r)),
   ]);
 
   const config: Config = {
@@ -98,6 +101,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     MEDIA_GRPC_ADDR: servers[0]!.address,
     TRANSCRIPTION_GRPC_ADDR: servers[1]!.address,
     LANGUAGE_GRPC_ADDR: servers[2]!.address,
+    SEARCH_GRPC_ADDR: servers[3]!.address,
     CONSUMER_GROUP: schema,
     BOOTSTRAP_ADMIN_EMAIL: 'admin@example.test',
     BOOTSTRAP_ADMIN_PASSWORD: 'admin-password-1',
@@ -130,13 +134,18 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     media,
     transcription,
     language,
+    search,
     nats,
     js,
     async publish(subject, type, data, id = newId('evt')) {
       const body = {
         specversion: '1.0',
         id,
-        source: subject.startsWith('likho.media') ? 'likho-media' : 'likho-transcription',
+        source: subject.startsWith('likho.media')
+          ? 'likho-media'
+          : subject.startsWith('likho.import')
+            ? 'likho-connector-ameyo'
+            : 'likho-transcription',
         type,
         time: new Date().toISOString(),
         subject: String(data.recording_id ?? ''),

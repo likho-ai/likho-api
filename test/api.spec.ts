@@ -372,11 +372,140 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(engines.find((e: any) => e.isDefault).registryId).toBe('faster-whisper/turbo');
     });
 
-    it('deleting removes the audio too', async () => {
+    it('deleting removes the audio too, and tells the others', async () => {
       const recording = await readyRecording(admin, 'gone.mp3');
       await admin.ok(`mutation ($id: String!) { deleteRecording(id: $id) }`, { id: recording.id });
       expect(h.media.deleted).toContain(recording.mediaId);
       expect(await admin.fails(GET_RECORDING, { id: recording.id })).toBe('not_found');
+      const told = await until(
+        async () => h.published('likho.recording.deleted').find((e) => e.data.recording_id === recording.id),
+        'the deleted event',
+      );
+      expect(told).toMatchObject({
+        type: 'likho.recording.deleted.v1',
+        data: { recording_id: recording.id, media_id: recording.mediaId },
+      });
+    });
+
+    it('search asks likho-search and decorates each line with its recording', async () => {
+      const recording = await readyRecording(admin, 'searchable.mp3');
+      h.search.hits = [
+        {
+          recordingId: recording.id,
+          transcriptId: 'trn_1',
+          segmentIndex: 3,
+          startSeconds: 12.5,
+          endSeconds: 15,
+          textRoman: 'order confirm hai',
+          textScript: 'ऑर्डर कन्फर्म है',
+          highlightRoman: '<mark>order</mark> confirm hai',
+          highlightScript: '<mark>ऑर्डर</mark> कन्फर्म है',
+          language: 'hi',
+        },
+        { recordingId: 'rec_01NOTHERE000000000000000000', transcriptId: 'trn_x', segmentIndex: 0 },
+      ];
+      const { search } = await admin.ok(
+        `query ($q: String!) { search(query: $q, filter: { language: "hi" }, pageSize: 10) {
+          total page pageSize hits { recording { id originalName } transcriptId segmentIndex startSeconds highlightRoman highlightScript }
+        } }`,
+        { q: 'order' },
+      );
+      expect(search.total).toBe(2);
+      // The line of a recording that is not here (deleted, or another workspace's) is left out.
+      expect(search.hits).toHaveLength(1);
+      expect(search.hits[0]).toMatchObject({
+        recording: { id: recording.id, originalName: 'searchable.mp3' },
+        transcriptId: 'trn_1',
+        segmentIndex: 3,
+        startSeconds: 12.5,
+        highlightRoman: '<mark>order</mark> confirm hai',
+      });
+      expect(h.search.asked.at(-1)).toMatchObject({ query: 'order', language: 'hi', pageSize: 10 });
+      expect(h.search.asked.at(-1)!.workspaceId).toBe(h.media.uploads.at(-1)!.workspaceId);
+      expect(await admin.fails(`query { search(query: "   ") { total } }`)).toBe('invalid');
+    });
+  });
+
+  describe('calls fetched from the dialer', () => {
+    it('an import is asked for on the bus and finished by the connector’s answer', async () => {
+      const { requestImport } = await admin.ok(
+        `mutation { requestImport(input: { externalId: "d000-0a1b2c3d-vce-0001" }) { id source externalId status transcribe } }`,
+      );
+      expect(requestImport).toMatchObject({
+        source: 'ameyo',
+        externalId: 'd000-0a1b2c3d-vce-0001',
+        status: 'requested',
+        transcribe: true,
+      });
+      const asked = await until(
+        async () =>
+          h.published('likho.import.requested').find((e) => e.data.request_id === requestImport.id)!,
+        'the import request',
+      );
+      expect(asked).toMatchObject({
+        type: 'likho.import.requested.v1',
+        data: { source: 'ameyo', external_id: 'd000-0a1b2c3d-vce-0001', transcribe: true },
+      });
+      expect(asked.data.workspace_id).toBe(h.media.uploads.at(-1)!.workspaceId);
+
+      // Asking again while it is pending does not ask twice.
+      const { requestImport: again } = await admin.ok(
+        `mutation { requestImport(input: { externalId: "d000-0a1b2c3d-vce-0001" }) { id } }`,
+      );
+      expect(again.id).toBe(requestImport.id);
+
+      // The connector stored the call.
+      await h.publish('likho.import.completed', 'likho.import.completed.v1', {
+        request_id: requestImport.id,
+        workspace_id: asked.data.workspace_id,
+        source: 'ameyo',
+        external_id: 'd000-0a1b2c3d-vce-0001',
+        recording_id: 'rec_01IMPORTED00000000000000000',
+      });
+      const done = await until(async () => {
+        const { import: row } = await admin.ok(
+          `query ($id: String!) { import(id: $id) { status recordingId } }`,
+          {
+            id: requestImport.id,
+          },
+        );
+        return row.status === 'completed' ? row : null;
+      }, 'the import to complete');
+      expect(done.recordingId).toBe('rec_01IMPORTED00000000000000000');
+
+      // Another one the dialer does not have.
+      const { requestImport: missing } = await admin.ok(
+        `mutation { requestImport(input: { externalId: "d000-0a1b2c3d-vce-0002", transcribe: false }) { id } }`,
+      );
+      await h.publish('likho.import.failed', 'likho.import.failed.v1', {
+        request_id: missing.id,
+        workspace_id: asked.data.workspace_id,
+        source: 'ameyo',
+        external_id: 'd000-0a1b2c3d-vce-0002',
+        reason: 'The dialer has no recording for this call.',
+        code: 'no_recording',
+      });
+      const failed = await until(async () => {
+        const { import: row } = await admin.ok(
+          `query ($id: String!) { import(id: $id) { status code reason } }`,
+          {
+            id: missing.id,
+          },
+        );
+        return row.status === 'failed' ? row : null;
+      }, 'the import to fail');
+      expect(failed).toMatchObject({
+        code: 'no_recording',
+        reason: 'The dialer has no recording for this call.',
+      });
+
+      const { imports } = await admin.ok(`query { imports(first: 10) { items { id status } hasMore } }`);
+      expect(imports.items.map((i: any) => i.id)).toEqual([missing.id, requestImport.id]);
+      const { imports: failedOnly } = await admin.ok(`query { imports(status: [failed]) { items { id } } }`);
+      expect(failedOnly.items.map((i: any) => i.id)).toEqual([missing.id]);
+      expect(await admin.fails(`mutation { requestImport(input: { externalId: "bad id!" }) { id } }`)).toBe(
+        'invalid',
+      );
     });
   });
 
@@ -426,6 +555,42 @@ describe.skipIf(!stackUp)('likho-api', () => {
         externalId: 'ext-9',
         status: 'uploading',
       });
+
+      // A connector says where the call comes from and what it knows about it.
+      const fromDialer = await (
+        await fetch(`${h.url}/api/v1/recordings`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            originalName: 'd000-0a1b2c3d-vce-0007.mp3',
+            sizeBytes: 999,
+            externalId: 'd000-0a1b2c3d-vce-0007',
+            source: 'ameyo',
+            attributes: {
+              campaign: 'inbound',
+              agent: 'agent-12',
+              disposition: 'sale',
+              callTime: '2026-10-03 09:12:00',
+            },
+          }),
+        })
+      ).json();
+      expect(fromDialer.recording).toMatchObject({
+        source: 'ameyo',
+        attributes: { campaign: 'inbound', agent: 'agent-12', disposition: 'sale' },
+      });
+      const { recording: shown } = await admin.ok(
+        `query ($id: String!) { recording(id: $id) { source attributes { key value } } }`,
+        { id: fromDialer.recording.id },
+      );
+      expect(shown.source).toBe('ameyo');
+      expect(shown.attributes).toContainEqual({ key: 'campaign', value: 'inbound' });
+      const search = await (
+        await fetch(`${h.url}/api/v1/search?q=order&pageSize=5`, {
+          headers: { authorization: `Bearer ${key}` },
+        })
+      ).json();
+      expect(search).toMatchObject({ page: 1, pageSize: 5 });
 
       const list = await (
         await fetch(`${h.url}/api/v1/recordings?search=ext-9`, {

@@ -4,6 +4,8 @@ import { CurrentUser } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Transcript, transcriptFromPb } from '../transcripts/transcripts.graphql.js';
 import {
+  Attribute,
+  attributeList,
   CreateJobInput,
   Job,
   JobStatusEnum,
@@ -56,9 +58,12 @@ export class RecordingsResolver {
     @CurrentUser() me: Principal,
     @Args('input') input: RequestUploadInput,
   ): Promise<UploadTicket> {
+    const { attributes, source, ...rest } = input;
     return this.service.requestUpload(me.workspaceId, me.userId, {
-      ...input,
-      source: me.kind === 'api_key' ? 'api' : 'upload',
+      ...rest,
+      // A person uploads; a script is 'api' unless it says which connector it is.
+      source: me.kind === 'api_key' ? source?.trim() || 'api' : 'upload',
+      attributes: Object.fromEntries((attributes ?? []).map((a) => [a.key, a.value])),
     });
   }
 
@@ -81,6 +86,11 @@ export class RecordingsResolver {
   async peaksUrl(@Parent() recording: RecordingRow): Promise<string | null> {
     if (!['ready', 'queued', 'transcribing', 'done'].includes(recording.status)) return null;
     return this.service.downloadUrl(recording, 'peaks');
+  }
+
+  @ResolveField(() => [Attribute], { description: 'Facts about the call from where it came.' })
+  attributes(@Parent() recording: RecordingRow): Attribute[] {
+    return attributeList(recording.attributes);
   }
 
   @ResolveField(() => [Job], { description: 'The jobs of this recording, newest first.' })

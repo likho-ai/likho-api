@@ -31,8 +31,31 @@ export interface UploadRequest {
   sizeBytes: number;
   contentType?: string;
   sha256?: string;
-  source: 'upload' | 'api' | 'dialer';
+  /** 'upload' (a person in the browser), 'api' (a script), or the connector's name ('ameyo'). */
+  source: string;
   externalId?: string;
+  /** Facts about the call from where it came (campaign, agent, disposition, call time, ...). */
+  attributes?: Record<string, string>;
+}
+
+/** A source name: short, lowercase, the kind of thing a connector is called. */
+export const SOURCE_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+const ATTRIBUTE_KEY = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/;
+const ATTRIBUTES_MAX = 40;
+
+/** Checks and tidies a recording's attributes. */
+export function cleanAttributes(raw: Record<string, unknown> | undefined): Record<string, string> {
+  if (!raw) return {};
+  const entries = Object.entries(raw);
+  if (entries.length > ATTRIBUTES_MAX) throw invalid(`At most ${ATTRIBUTES_MAX} attributes.`);
+  const clean: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    if (!ATTRIBUTE_KEY.test(key)) throw invalid(`Attribute names are letters, digits and _: ${key}`);
+    const text = value == null ? '' : String(value).trim();
+    if (text.length > 500) throw invalid(`Attribute ${key} is too long.`);
+    if (text) clean[key] = text;
+  }
+  return clean;
 }
 
 export interface UploadAnswer {
@@ -83,6 +106,8 @@ export class RecordingsService {
       throw invalid('sizeBytes must be a whole number.');
     if (input.sha256 && !/^[0-9a-f]{64}$/.test(input.sha256))
       throw invalid('sha256 must be 64 lowercase hex characters.');
+    if (!SOURCE_PATTERN.test(input.source)) throw invalid('source is a short lowercase name.');
+    const attributes = cleanAttributes(input.attributes);
 
     const recordingId = newId('rec');
     let reply;
@@ -121,6 +146,7 @@ export class RecordingsService {
         sha256: input.sha256 ?? '',
         source: input.source,
         externalId: input.externalId?.trim() ?? '',
+        attributes,
         status: reply.existingMedia ? 'ready' : 'uploading',
         createdBy: userId,
       })
@@ -222,7 +248,43 @@ export class RecordingsService {
       throw fromRpc(error, 'media');
     }
     await this.db.delete(recordings).where(eq(recordings.id, id));
+    // The search index and the connectors forget it too.
+    await this.bus.publish(
+      'likho.recording.deleted',
+      event('likho.recording.deleted.v1', id, {
+        recording_id: id,
+        workspace_id: workspaceId,
+        media_id: recording.mediaId,
+      }),
+    );
     await this.live.publish({ kind: 'recording', recordingId: id, data: { deleted: true } });
+  }
+
+  /** Several recordings by id, for decorating search hits (only this workspace's). */
+  async byIds(workspaceId: string, ids: string[]): Promise<Map<string, RecordingRow>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select()
+      .from(recordings)
+      .where(and(eq(recordings.workspaceId, workspaceId), inArray(recordings.id, [...new Set(ids)])));
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  /** The recording a connector made for a call, if any. */
+  async byExternalId(workspaceId: string, source: string, externalId: string): Promise<RecordingRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(recordings)
+      .where(
+        and(
+          eq(recordings.workspaceId, workspaceId),
+          eq(recordings.source, source),
+          eq(recordings.externalId, externalId),
+        ),
+      )
+      .orderBy(desc(recordings.createdAt))
+      .limit(1);
+    return row ?? null;
   }
 
   // ---------------------------------------------------------------- jobs

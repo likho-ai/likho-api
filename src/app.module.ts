@@ -11,12 +11,21 @@ import { Config, loadConfig } from './config/config.js';
 import { ConfigModule } from './config/config.module.js';
 import { DbModule } from './db/db.module.js';
 import { HealthController } from './health/health.controller.js';
+import { ImportsResolver } from './imports/imports.resolver.js';
+import { ImportsService } from './imports/imports.service.js';
 import { LiveController } from './live/live.controller.js';
 import { LiveModule } from './live/live.module.js';
 import { EventsConsumer } from './recordings/events.consumer.js';
 import { JobsResolver, RecordingsResolver } from './recordings/recordings.resolver.js';
 import { RecordingsService } from './recordings/recordings.service.js';
-import { JobsController, RecordingsController } from './rest/rest.controller.js';
+import {
+  ImportsController,
+  JobsController,
+  RecordingsController,
+  SearchController,
+} from './rest/rest.controller.js';
+import { SearchResolver } from './search/search.resolver.js';
+import { SearchService } from './search/search.service.js';
 import { SettingsResolver } from './settings/settings.resolver.js';
 import { TranscriptsResolver } from './transcripts/transcripts.resolver.js';
 import { VocabularyResolver } from './vocabulary/vocabulary.resolver.js';
@@ -62,12 +71,23 @@ export function appModule(config?: Config) {
         includeStacktraceInErrorResponses: false,
       }),
     ],
-    controllers: [HealthController, RecordingsController, JobsController, LiveController],
+    controllers: [
+      HealthController,
+      RecordingsController,
+      JobsController,
+      SearchController,
+      ImportsController,
+      LiveController,
+    ],
     providers: [
       RecordingsService,
+      ImportsService,
+      SearchService,
       EventsConsumer,
       RecordingsResolver,
       JobsResolver,
+      SearchResolver,
+      ImportsResolver,
       TranscriptsResolver,
       VocabularyResolver,
       SettingsResolver,

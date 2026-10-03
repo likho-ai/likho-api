@@ -22,6 +22,9 @@ const schema = z.object({
   MEDIA_GRPC_ADDR: z.string().default('localhost:5010'),
   TRANSCRIPTION_GRPC_ADDR: z.string().default('localhost:5020'),
   LANGUAGE_GRPC_ADDR: z.string().default('localhost:5030'),
+  SEARCH_GRPC_ADDR: z.string().default('localhost:5040'),
+  /** Which connector answers import requests by default ('ameyo'). Empty = imports are off. */
+  IMPORT_SOURCE: z.string().default('ameyo'),
   RPC_TIMEOUT_SECONDS: seconds.default(10),
 
   /** The address browsers use. Cookies are marked Secure when it is https. */

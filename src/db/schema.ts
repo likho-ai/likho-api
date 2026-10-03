@@ -115,6 +115,11 @@ export const recordings = pgTable(
     source: text().notNull().default('upload'),
     /** The caller's own id for the call, for connectors. */
     externalId: text('external_id').notNull().default(''),
+    /** Facts about the call from where it came (campaign, agent, disposition, call time, ...). */
+    attributes: jsonb()
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     status: text().$type<RecordingStatus>().notNull().default('uploading'),
     failureReason: text('failure_reason').notNull().default(''),
     latestTranscriptId: text('latest_transcript_id').notNull().default(''),
@@ -177,6 +182,36 @@ export const settings = pgTable(
     updatedAt: now(),
   },
   (table) => [primaryKey({ columns: [table.workspaceId, table.key] })],
+);
+
+/** A call asked for by its id in an external system (the dialer); a connector fetches it. */
+export const IMPORT_STATUSES = ['requested', 'completed', 'failed'] as const;
+export type ImportStatus = (typeof IMPORT_STATUSES)[number];
+
+export const imports = pgTable(
+  'imports',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** Which connector: 'ameyo'. */
+    source: text().notNull(),
+    externalId: text('external_id').notNull(),
+    transcribe: boolean().notNull().default(true),
+    status: text().$type<ImportStatus>().notNull().default('requested'),
+    recordingId: text('recording_id').notNull().default(''),
+    /** Why it failed, for a person; and the connector's code (not_found, no_recording, ...). */
+    reason: text().notNull().default(''),
+    code: text().notNull().default(''),
+    requestedBy: text('requested_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: now(),
+    updatedAt: now(),
+  },
+  (table) => [
+    index('imports_workspace_created').on(table.workspaceId, table.createdAt),
+    index('imports_workspace_external').on(table.workspaceId, table.source, table.externalId),
+  ],
 );
 
 /** Events already acted on, so an event delivered twice changes nothing twice. */

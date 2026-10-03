@@ -362,6 +362,204 @@
         ]
       }
     },
+    "/api/v1/search": {
+      "get": {
+        "description": "A few words in either layer, typos allowed; the matches are inside <mark>…</mark>.",
+        "operationId": "SearchController_find",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "A few words, in either layer; typos allowed.",
+            "schema": {
+              "example": "order confirm",
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "required": false,
+            "in": "query",
+            "description": "A detected language (ISO 639-1).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recordingId",
+            "required": false,
+            "in": "query",
+            "description": "Only this recording.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "Transcripts created from this moment (ISO 8601).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "Transcripts created up to this moment (ISO 8601).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search every transcript line",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/v1/imports": {
+      "post": {
+        "description": "The connector fetches the call; poll the import, or the recordings, to see it arrive.",
+        "operationId": "ImportsController_request",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestImportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch a call from the dialer by its id",
+        "tags": [
+          "imports"
+        ]
+      },
+      "get": {
+        "description": "Newest first.",
+        "operationId": "ImportsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "requested",
+                "completed",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "The id of the last import of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "first",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List imports",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{id}": {
+      "get": {
+        "operationId": "ImportsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/events/jobs/{id}": {
       "get": {
         "operationId": "LiveController_job",
@@ -445,6 +643,20 @@
           "externalId": {
             "type": "string",
             "description": "Your own id for the call."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where the call comes from: a connector’s name, e.g. ameyo.",
+            "example": "ameyo"
+          },
+          "attributes": {
+            "type": "object",
+            "description": "Facts about the call: campaign, agent, disposition, call time, ...",
+            "example": {
+              "campaign": "inbound",
+              "agent": "agent-12",
+              "disposition": "sale"
+            }
           }
         },
         "required": [
@@ -468,6 +680,27 @@
             "type": "boolean"
           }
         }
+      },
+      "RequestImportDto": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string",
+            "description": "The call’s id in the dialer (its crt_object_id).",
+            "example": "d000-0a1b2c3d-vce-0001"
+          },
+          "source": {
+            "type": "string",
+            "description": "Which connector; empty = the default one."
+          },
+          "transcribe": {
+            "type": "boolean",
+            "description": "Transcribe once stored (default true)."
+          }
+        },
+        "required": [
+          "externalId"
+        ]
       }
     }
   }
