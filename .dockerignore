@@ -5,3 +5,5 @@ dist
 test
 *.md
 .env
+.env.local
+.env.*.local
