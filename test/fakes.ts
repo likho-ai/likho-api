@@ -11,6 +11,7 @@ import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
 import { HitSchema, SearchService, type Hit } from '@likho-ai/contracts/search/v1/search_pb';
 import {
+  Layer,
   TranscriptSchema,
   TranscriptionService,
   type Transcript,
@@ -73,6 +74,17 @@ export class FakeTranscription {
   transcripts = new Map<string, Transcript>();
   cancelled: string[] = [];
   retransliterated: string[] = [];
+  corrections: {
+    id: string;
+    recordingId: string;
+    transcriptId: string;
+    correctedTranscriptId: string;
+    segmentIndex: number;
+    layer: Layer;
+    before: string;
+    after: string;
+    userId: string;
+  }[] = [];
 
   /** Makes a transcript the service will answer with, as if a job stored it. */
   add(id: string, recordingId: string, jobId: string, version = 1): Transcript {
@@ -119,6 +131,34 @@ export class FakeTranscription {
         this.retransliterated.push(req.transcriptId);
         return { transcript: this.add(`${old.id}v${old.version + 1}`, old.recordingId, '', old.version + 1) };
       },
+      correctSegment: (req) => {
+        const old = this.transcripts.get(req.transcriptId);
+        if (!old) throw new ConnectError('not found', Code.NotFound);
+        const line = old.segments[req.segmentIndex];
+        if (!line) throw new ConnectError(`no line ${req.segmentIndex}`, Code.NotFound);
+        const field = req.layer === Layer.SCRIPT ? 'textScript' : 'textRoman';
+        const next = this.add(`${old.id}v${old.version + 1}`, old.recordingId, '', old.version + 1);
+        next.segments[req.segmentIndex]![field] = req.text;
+        if (req.layer === Layer.SCRIPT) next.segments[req.segmentIndex]!.textRoman = `roman(${req.text})`;
+        const correction = {
+          id: `cor_${this.corrections.length + 1}`,
+          recordingId: old.recordingId,
+          transcriptId: old.id,
+          correctedTranscriptId: next.id,
+          segmentIndex: req.segmentIndex,
+          layer: req.layer,
+          before: line[field],
+          after: req.text,
+          userId: req.userId,
+        };
+        this.corrections.unshift(correction);
+        return { transcript: next, correction: { ...correction, createdAt: timestampFromDate(new Date()) } };
+      },
+      listCorrections: (req) => ({
+        corrections: this.corrections
+          .filter((c) => c.recordingId === req.recordingId)
+          .map((c) => ({ ...c, createdAt: timestampFromDate(new Date()) })),
+      }),
       listEngines: () => ({
         engines: [
           {

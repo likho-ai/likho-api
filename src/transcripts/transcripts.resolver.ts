@@ -2,9 +2,16 @@ import { Args, Field, Mutation, ObjectType, Query, Resolver } from '@nestjs/grap
 import { CurrentUser } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Clients, fromRpc } from '../clients/clients.module.js';
-import { forbidden } from '../common/errors.js';
+import { forbidden, invalid } from '../common/errors.js';
 import { RecordingsService } from '../recordings/recordings.service.js';
-import { Transcript, transcriptFromPb } from './transcripts.graphql.js';
+import {
+  Correction,
+  correctionFromPb,
+  CorrectSegmentInput,
+  layerToPb,
+  Transcript,
+  transcriptFromPb,
+} from './transcripts.graphql.js';
 
 @ObjectType()
 export class Engine {
@@ -72,6 +79,54 @@ export class TranscriptsResolver {
         latestTranscriptId: rebuilt.id,
       });
       return rebuilt;
+    } catch (error) {
+      throw fromRpc(error, 'transcription');
+    }
+  }
+
+  @Mutation(() => Transcript, {
+    description:
+      'Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.',
+  })
+  async correctSegment(
+    @CurrentUser() me: Principal,
+    @Args('input') input: CorrectSegmentInput,
+  ): Promise<Transcript> {
+    const existing = await this.checked(me, input.transcriptId);
+    if (me.kind === 'api_key') throw forbidden('An API key cannot change transcripts.');
+    const text = input.text.trim();
+    if (!text) throw invalid('The corrected line is empty.');
+    if (text.length > 2000) throw invalid('The corrected line is too long.');
+    try {
+      const reply = await this.clients.transcription.correctSegment({
+        transcriptId: input.transcriptId,
+        segmentIndex: input.segmentIndex,
+        layer: layerToPb(input.layer),
+        text,
+        userId: me.userId ?? '',
+        workspaceId: me.workspaceId,
+      });
+      const corrected = transcriptFromPb(reply.transcript!);
+      await this.recordings.setRecordingStatus(existing.recordingId, 'done', {
+        latestTranscriptId: corrected.id,
+      });
+      return corrected;
+    } catch (error) {
+      throw fromRpc(error, 'transcription');
+    }
+  }
+
+  @Query(() => [Correction], {
+    description: 'Every correction made to a recording’s transcripts, newest first.',
+  })
+  async corrections(
+    @CurrentUser() me: Principal,
+    @Args('recordingId') recordingId: string,
+  ): Promise<Correction[]> {
+    await this.recordings.get(me.workspaceId, recordingId);
+    try {
+      const reply = await this.clients.transcription.listCorrections({ recordingId });
+      return reply.corrections.map(correctionFromPb);
     } catch (error) {
       throw fromRpc(error, 'transcription');
     }

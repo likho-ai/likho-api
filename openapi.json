@@ -238,6 +238,74 @@
         ]
       }
     },
+    "/api/v1/recordings/{id}/transcript/corrections": {
+      "post": {
+        "description": "Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.",
+        "operationId": "RecordingsController_correct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectSegmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Correct one line",
+        "tags": [
+          "recordings"
+        ]
+      },
+      "get": {
+        "description": "Newest first.",
+        "operationId": "RecordingsController_corrections",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The corrections made to a recording",
+        "tags": [
+          "recordings"
+        ]
+      }
+    },
     "/api/v1/recordings/{id}/jobs": {
       "post": {
         "operationId": "RecordingsController_createJob",
@@ -662,6 +730,37 @@
         "required": [
           "originalName",
           "sizeBytes"
+        ]
+      },
+      "CorrectSegmentDto": {
+        "type": "object",
+        "properties": {
+          "transcriptId": {
+            "type": "string",
+            "description": "The version being looked at; it must be the latest."
+          },
+          "segmentIndex": {
+            "type": "number",
+            "example": 3
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "script",
+              "roman"
+            ],
+            "description": "script: as spoken, in its script. roman: the Hinglish."
+          },
+          "text": {
+            "type": "string",
+            "description": "What the line should read."
+          }
+        },
+        "required": [
+          "transcriptId",
+          "segmentIndex",
+          "layer",
+          "text"
         ]
       },
       "CreateJobDto": {

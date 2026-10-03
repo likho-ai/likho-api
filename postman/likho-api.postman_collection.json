@@ -1,7 +1,7 @@
 {
   "item": [
     {
-      "id": "24127e70-598d-4225-99dd-0732c23bfa1e",
+      "id": "2ea88eb0-f656-4ddc-8f83-1801c830dc40",
       "name": "Health",
       "description": {
         "content": "",
@@ -9,7 +9,7 @@
       },
       "item": [
         {
-          "id": "a4c2fd51-8029-4a97-a135-da09d579729c",
+          "id": "49dad8a7-b29e-435d-9810-5a649f7ff46d",
           "name": "Health Controller alive",
           "request": {
             "name": "Health Controller alive",
@@ -29,7 +29,7 @@
           },
           "response": [
             {
-              "id": "99905c85-6f16-4c79-82fc-26c210760564",
+              "id": "58ac9c8d-a80c-40da-8083-6d69bf57af8f",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -63,7 +63,7 @@
           }
         },
         {
-          "id": "34d2c6e8-babe-4124-be36-ef382835970f",
+          "id": "b8190a1e-9bab-4a33-9c4f-90ef03d9eaf2",
           "name": "Health Controller ready",
           "request": {
             "name": "Health Controller ready",
@@ -83,7 +83,7 @@
           },
           "response": [
             {
-              "id": "2fba83ad-ab3d-4a08-aeb8-a00709d6ce47",
+              "id": "57d83300-2f6e-4fd5-89d6-33aec3b6910a",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -120,7 +120,7 @@
       "event": []
     },
     {
-      "id": "ba2f8aaa-705b-4ae1-99b0-7cdffa4d2ad5",
+      "id": "ce0f5b3a-2898-4a39-85a1-b83a8b4ddb05",
       "name": "recordings",
       "description": {
         "content": "",
@@ -128,7 +128,7 @@
       },
       "item": [
         {
-          "id": "19604741-c596-4f3a-a082-3241ca4f0eba",
+          "id": "73ef5d5c-e319-4682-8b14-80eb6cded924",
           "name": "Start an upload",
           "request": {
             "name": "Start an upload",
@@ -176,7 +176,7 @@
           },
           "response": [
             {
-              "id": "afe9c9ca-c48f-4da2-813e-8a58078d9fff",
+              "id": "f3e3405e-c607-4db4-8299-dbe659669266",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -230,7 +230,7 @@
           }
         },
         {
-          "id": "44f50bf1-3081-4771-931b-bf2979b4b6d1",
+          "id": "19a718de-d637-45d4-9716-8ded7a23c059",
           "name": "List recordings",
           "request": {
             "name": "List recordings",
@@ -285,7 +285,7 @@
           },
           "response": [
             {
-              "id": "70c1656c-e3a1-42be-b760-13c7f3229956",
+              "id": "66562a82-b6aa-4f87-97ce-b2b515b88e76",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -348,7 +348,7 @@
           }
         },
         {
-          "id": "f367023a-74b1-432b-ba55-74da7bab2c97",
+          "id": "ba461382-319a-4356-97e9-ee2bf909fcba",
           "name": "One recording",
           "request": {
             "name": "One recording",
@@ -387,7 +387,7 @@
           },
           "response": [
             {
-              "id": "b1141994-1d53-4243-ada7-1c92ba76d494",
+              "id": "ab0cbe92-05a6-4818-860b-6cb6a3abcfb6",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -442,7 +442,7 @@
           }
         },
         {
-          "id": "2c308f77-efec-4b72-96ba-a126d1f99450",
+          "id": "a5b3bd14-e69f-48c6-9d9c-ad23c3199496",
           "name": "Delete a recording, its audio and its jobs",
           "request": {
             "name": "Delete a recording, its audio and its jobs",
@@ -481,7 +481,7 @@
           },
           "response": [
             {
-              "id": "dfc84788-0e17-42e6-9d4d-a3869ff127d0",
+              "id": "f1495f51-240f-4e11-a910-437088faa80f",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -536,7 +536,7 @@
           }
         },
         {
-          "id": "a005b1f7-fb20-4a25-9973-ebc2a1fb1190",
+          "id": "f0392b93-50e3-48e4-9735-21941f96469a",
           "name": "A short-lived link to the audio a browser plays",
           "request": {
             "name": "A short-lived link to the audio a browser plays",
@@ -576,7 +576,7 @@
           },
           "response": [
             {
-              "id": "9184de0f-c54f-4e82-90e8-95cf60eed0ac",
+              "id": "abebd8bd-6dbd-4e35-92a5-33406c4576e9",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -632,7 +632,7 @@
           }
         },
         {
-          "id": "4faa6e52-b7b0-43f3-ae6f-85788a046989",
+          "id": "719c5834-65fb-4508-8921-218c4f2cd699",
           "name": "The newest transcript",
           "request": {
             "name": "The newest transcript",
@@ -675,7 +675,7 @@
           },
           "response": [
             {
-              "id": "a74272ba-63fc-4bb1-a43d-6d79647a6014",
+              "id": "934572bf-ae2b-4a6a-89bb-ef97cb501195",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -731,7 +731,232 @@
           }
         },
         {
-          "id": "48b90793-f3e6-4258-8417-d5feb154c2ef",
+          "id": "9d7cdcd4-28c2-4d81-aa0a-eb7698ecab51",
+          "name": "Correct one line",
+          "request": {
+            "name": "Correct one line",
+            "description": {
+              "content": "Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "recordings",
+                ":id",
+                "transcript",
+                "corrections"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "disabled": false,
+                  "type": "any",
+                  "value": "<string>",
+                  "key": "id",
+                  "description": "(Required) "
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transcriptId\": \"<string>\",\n  \"segmentIndex\": \"<number>\",\n  \"layer\": \"<string>\",\n  \"text\": \"<string>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "id": "93a34d4e-884c-4bf5-be77-9167f0155c8b",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "recordings",
+                    ":id",
+                    "transcript",
+                    "corrections"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [],
+                  "variable": [
+                    {
+                      "disabled": false,
+                      "type": "any",
+                      "value": "<string>",
+                      "key": "id",
+                      "description": "(Required) "
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transcriptId\": \"<string>\",\n  \"segmentIndex\": 3,\n  \"layer\": \"<string>\",\n  \"text\": \"<string>\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        },
+        {
+          "id": "53fdb257-2a45-4da2-bf7e-157f4d45d22f",
+          "name": "The corrections made to a recording",
+          "request": {
+            "name": "The corrections made to a recording",
+            "description": {
+              "content": "Newest first.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "recordings",
+                ":id",
+                "transcript",
+                "corrections"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "disabled": false,
+                  "type": "any",
+                  "value": "<string>",
+                  "key": "id",
+                  "description": "(Required) "
+                }
+              ]
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "55eb5a27-8b75-4525-95d5-4b9701e0d2a1",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "recordings",
+                    ":id",
+                    "transcript",
+                    "corrections"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [],
+                  "variable": [
+                    {
+                      "disabled": false,
+                      "type": "any",
+                      "value": "<string>",
+                      "key": "id",
+                      "description": "(Required) "
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        },
+        {
+          "id": "e79d4151-3f4a-4bad-a903-fbe8af8d8344",
           "name": "Queue a transcription",
           "request": {
             "name": "Queue a transcription",
@@ -786,7 +1011,7 @@
           },
           "response": [
             {
-              "id": "cc1fac81-cdb4-48fc-9452-73316a529319",
+              "id": "a7f9fae6-c356-4a80-a2a3-f57913d94852",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -850,7 +1075,7 @@
           }
         },
         {
-          "id": "beb37328-e173-4704-b5b1-d0558e5a658a",
+          "id": "4db800de-7f97-42ce-b524-5ae864a125df",
           "name": "The jobs of a recording, newest first",
           "request": {
             "name": "The jobs of a recording, newest first",
@@ -890,7 +1115,7 @@
           },
           "response": [
             {
-              "id": "2eff4623-08df-497a-8f8c-426e254020bb",
+              "id": "4d53e8f4-baff-4b4e-8c69-a26eb87f1797",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -949,7 +1174,7 @@
       "event": []
     },
     {
-      "id": "762c0716-dcec-44e3-98e2-9c79c99cb771",
+      "id": "35096dc5-06b5-4b9e-a7c2-41d67bcdcda0",
       "name": "jobs",
       "description": {
         "content": "",
@@ -957,7 +1182,7 @@
       },
       "item": [
         {
-          "id": "6b7c16da-f0d6-42c3-8565-ad3c005b0554",
+          "id": "c02549b7-0a16-4b80-b521-f9d1a72665bc",
           "name": "One job",
           "request": {
             "name": "One job",
@@ -996,7 +1221,7 @@
           },
           "response": [
             {
-              "id": "95ee3e05-8024-44d2-948a-0ab6061a7d66",
+              "id": "3fa8cb3c-7829-402a-a2b0-81fa43deb01f",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1051,7 +1276,7 @@
           }
         },
         {
-          "id": "442e7d74-e965-4813-9569-ee0d375377c6",
+          "id": "d8ad5697-fe7d-4f60-b1c7-283c499e2efb",
           "name": "Stop a waiting or running job",
           "request": {
             "name": "Stop a waiting or running job",
@@ -1091,7 +1316,7 @@
           },
           "response": [
             {
-              "id": "c4731fcb-9851-4827-983c-3fdb365a538b",
+              "id": "2ab1d2b8-a742-4027-ad12-54b45c9f2324",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1150,7 +1375,7 @@
       "event": []
     },
     {
-      "id": "fceafd55-92e5-4014-bf73-52f47e381aec",
+      "id": "9f4ac66c-a95e-4552-9a47-288f54fe00cc",
       "name": "search",
       "description": {
         "content": "",
@@ -1158,7 +1383,7 @@
       },
       "item": [
         {
-          "id": "3d65a8e5-b8ac-4629-a145-afdd9fd04818",
+          "id": "3e351910-c45e-4893-9af7-8292b91abd71",
           "name": "Search every transcript line",
           "request": {
             "name": "Search every transcript line",
@@ -1232,7 +1457,7 @@
           },
           "response": [
             {
-              "id": "fbb9468d-a534-43ce-86dd-d4649e9a8342",
+              "id": "4f3f7c0b-f8e7-4f1c-adef-eda80267369c",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1310,7 +1535,7 @@
       "event": []
     },
     {
-      "id": "53534031-3f36-46ac-8a79-36783191bdbb",
+      "id": "b645d69a-ad7a-4358-ba5b-429a5d013966",
       "name": "imports",
       "description": {
         "content": "",
@@ -1318,7 +1543,7 @@
       },
       "item": [
         {
-          "id": "b9b775b2-0961-4055-98fe-febb692dd648",
+          "id": "a72514c8-ab0b-4bea-88bc-44697887e3f0",
           "name": "Fetch a call from the dialer by its id",
           "request": {
             "name": "Fetch a call from the dialer by its id",
@@ -1366,7 +1591,7 @@
           },
           "response": [
             {
-              "id": "7a422473-98ea-4436-841c-9f68e552e10d",
+              "id": "5e5826bc-be89-4f04-8cbe-99f21e31c12f",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1420,7 +1645,7 @@
           }
         },
         {
-          "id": "40526111-bc00-4e97-8e45-f88fad45bd19",
+          "id": "eeab4a35-fa93-47d9-8a47-102861c0fef9",
           "name": "List imports",
           "request": {
             "name": "List imports",
@@ -1470,7 +1695,7 @@
           },
           "response": [
             {
-              "id": "81683674-c3f4-428a-b0fe-74575dc77402",
+              "id": "d776d04e-c870-4917-9d1a-22e0a7b14960",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1529,7 +1754,7 @@
           }
         },
         {
-          "id": "8474a117-8507-4a20-a9ba-f2b589a2b17c",
+          "id": "156ddc3f-9039-439a-bc4a-221e0571c3b6",
           "name": "One import",
           "request": {
             "name": "One import",
@@ -1568,7 +1793,7 @@
           },
           "response": [
             {
-              "id": "a428fb8c-2bc2-4fc2-90a3-a4a97b47f175",
+              "id": "6a7088fe-d2c3-40c4-887b-cf56446b1bf7",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1626,7 +1851,7 @@
       "event": []
     },
     {
-      "id": "d2258c31-86f6-4374-a41c-ba2208d40cdf",
+      "id": "0f91bf91-ee02-4eec-9de0-cac5c5549565",
       "name": "Live",
       "description": {
         "content": "",
@@ -1634,7 +1859,7 @@
       },
       "item": [
         {
-          "id": "383bb135-18fa-4b61-905c-1cae31dc10d4",
+          "id": "16c866f4-76c7-4453-990b-30fc5fc73b4e",
           "name": "Live Controller job",
           "request": {
             "name": "Live Controller job",
@@ -1664,7 +1889,7 @@
           },
           "response": [
             {
-              "id": "77fa393a-ea75-405b-b577-66cc942e6592",
+              "id": "af36a3ec-48c2-48e6-98ea-ed79c30ecf10",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1708,7 +1933,7 @@
           }
         },
         {
-          "id": "7268aa3a-628f-4af4-a68a-e74568de4686",
+          "id": "9345aef4-16dc-4d5c-891e-3ff33fa6430e",
           "name": "Live Controller workspace",
           "request": {
             "name": "Live Controller workspace",
@@ -1729,7 +1954,7 @@
           },
           "response": [
             {
-              "id": "2f503ae3-366a-4d43-923a-8d293d281e93",
+              "id": "cad13eea-96e4-48aa-a21c-84bf30c7f278",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1776,7 +2001,7 @@
     }
   ],
   "info": {
-    "_postman_id": "1e8b4423-9e02-452d-90af-e9e226f290a7",
+    "_postman_id": "0a438c0b-11ba-482e-8b87-70d769905046",
     "name": "Likho API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": {

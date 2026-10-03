@@ -372,6 +372,42 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(engines.find((e: any) => e.isDefault).registryId).toBe('faster-whisper/turbo');
     });
 
+    it('a corrected line makes the next version and is listed', async () => {
+      const { recordings } = await admin.ok(
+        `query { recordings(filter: { status: [done] }) { items { id latestTranscriptId } } }`,
+      );
+      const [done] = recordings.items;
+      const { correctSegment } = await admin.ok(
+        `mutation ($input: CorrectSegmentInput!) { correctSegment(input: $input) { id version segments { index textRoman textScript } } }`,
+        {
+          input: { transcriptId: done.latestTranscriptId, segmentIndex: 1, layer: 'roman', text: 'shukriya' },
+        },
+      );
+      expect(correctSegment.segments[1]).toMatchObject({ textRoman: 'shukriya', textScript: 'धन्यवाद' });
+      const { recording } = await admin.ok(GET_RECORDING, { id: done.id });
+      expect(recording.latestTranscriptId).toBe(correctSegment.id);
+      const { corrections } = await admin.ok(
+        `query ($id: String!) { corrections(recordingId: $id) { segmentIndex layer before after userId correctedTranscriptId } }`,
+        { id: done.id },
+      );
+      expect(corrections[0]).toMatchObject({
+        segmentIndex: 1,
+        layer: 'roman',
+        before: 'dhanyavaad',
+        after: 'shukriya',
+        correctedTranscriptId: correctSegment.id,
+      });
+      expect(corrections[0].userId).toMatch(/^usr_/);
+      expect(
+        await admin.fails(
+          `mutation ($input: CorrectSegmentInput!) { correctSegment(input: $input) { id } }`,
+          {
+            input: { transcriptId: correctSegment.id, segmentIndex: 0, layer: 'roman', text: '   ' },
+          },
+        ),
+      ).toBe('invalid');
+    });
+
     it('deleting removes the audio too, and tells the others', async () => {
       const recording = await readyRecording(admin, 'gone.mp3');
       await admin.ok(`mutation ($id: String!) { deleteRecording(id: $id) }`, { id: recording.id });

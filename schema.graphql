@@ -1,7 +1,3 @@
-# ------------------------------------------------------
-# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
-# ------------------------------------------------------
-
 type ApiKey {
   createdAt: DateTime!
   id: String!
@@ -21,6 +17,37 @@ type Attribute {
 input AttributeInput {
   key: String!
   value: String!
+}
+
+input CorrectSegmentInput {
+  layer: Layer!
+  segmentIndex: Int!
+
+  """What the line should read."""
+  text: String!
+
+  """The version being looked at; it must be the latest."""
+  transcriptId: String!
+}
+
+"""
+One change a person made to one line: it made the next version, and is kept.
+"""
+type Correction {
+  after: String!
+  before: String!
+
+  """The version the correction made."""
+  correctedTranscriptId: String!
+  createdAt: DateTime!
+  id: String!
+  layer: Layer!
+  recordingId: String!
+  segmentIndex: Int!
+
+  """The version the person was looking at."""
+  transcriptId: String!
+  userId: String!
 }
 
 input CreateJobInput {
@@ -136,6 +163,12 @@ type LanguageDetection {
   probability: Float!
 }
 
+"""script: as spoken, in its script. roman: the Hinglish."""
+enum Layer {
+  roman
+  script
+}
+
 type Me {
   email: String!
   id: String
@@ -147,6 +180,11 @@ type Me {
 type Mutation {
   """Stops a waiting or running job."""
   cancelJob(id: String!): Job!
+
+  """
+  Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.
+  """
+  correctSegment(input: CorrectSegmentInput!): Transcript!
 
   """Makes a key for scripts and connectors."""
   createApiKey(name: String!): NewApiKey!
@@ -194,6 +232,9 @@ type NewApiKey {
 
 type Query {
   apiKeys: [ApiKey!]!
+
+  """Every correction made to a recording’s transcripts, newest first."""
+  corrections(recordingId: String!): [Correction!]!
 
   """The speech models a worker can run."""
   engines: [Engine!]!

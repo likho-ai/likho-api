@@ -1,7 +1,60 @@
 /** Transcripts as the web app reads them, mapped from likho.transcription.v1. */
-import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
-import type { Transcript as TranscriptPb } from '@likho-ai/contracts/transcription/v1/transcription_pb';
+import { Field, Float, InputType, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import {
+  Layer as LayerPb,
+  type Correction as CorrectionPb,
+  type Transcript as TranscriptPb,
+} from '@likho-ai/contracts/transcription/v1/transcription_pb';
 import { Script } from '@likho-ai/contracts/common/v1/common_pb';
+
+/** The layer of a line a person corrected. */
+export const LayerEnum = { script: 'script', roman: 'roman' } as const;
+registerEnumType(LayerEnum, {
+  name: 'Layer',
+  description: 'script: as spoken, in its script. roman: the Hinglish.',
+});
+export type Layer = keyof typeof LayerEnum;
+
+export function layerToPb(layer: Layer): LayerPb {
+  return layer === 'script' ? LayerPb.SCRIPT : LayerPb.ROMAN;
+}
+
+@ObjectType({ description: 'One change a person made to one line: it made the next version, and is kept.' })
+export class Correction {
+  @Field() id: string;
+  @Field() recordingId: string;
+  @Field({ description: 'The version the person was looking at.' }) transcriptId: string;
+  @Field({ description: 'The version the correction made.' }) correctedTranscriptId: string;
+  @Field(() => Int) segmentIndex: number;
+  @Field(() => LayerEnum) layer: Layer;
+  @Field() before: string;
+  @Field() after: string;
+  @Field() userId: string;
+  @Field() createdAt: Date;
+}
+
+export function correctionFromPb(c: CorrectionPb): Correction {
+  return {
+    id: c.id,
+    recordingId: c.recordingId,
+    transcriptId: c.transcriptId,
+    correctedTranscriptId: c.correctedTranscriptId,
+    segmentIndex: c.segmentIndex,
+    layer: c.layer === LayerPb.SCRIPT ? 'script' : 'roman',
+    before: c.before,
+    after: c.after,
+    userId: c.userId,
+    createdAt: c.createdAt ? new Date(Number(c.createdAt.seconds) * 1000) : new Date(0),
+  };
+}
+
+@InputType()
+export class CorrectSegmentInput {
+  @Field({ description: 'The version being looked at; it must be the latest.' }) transcriptId: string;
+  @Field(() => Int) segmentIndex: number;
+  @Field(() => LayerEnum) layer: Layer;
+  @Field({ description: 'What the line should read.' }) text: string;
+}
 
 @ObjectType()
 export class Segment {

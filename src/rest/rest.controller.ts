@@ -29,7 +29,12 @@ import {
 import { type ImportRow, ImportsService } from '../imports/imports.service.js';
 import { SearchService } from '../search/search.service.js';
 import { type JobRow, type RecordingRow, RecordingsService } from '../recordings/recordings.service.js';
-import { transcriptFromPb } from '../transcripts/transcripts.graphql.js';
+import {
+  correctionFromPb,
+  type Layer,
+  layerToPb,
+  transcriptFromPb,
+} from '../transcripts/transcripts.graphql.js';
 
 export class RequestUploadDto {
   @ApiProperty({ example: 'call-2026-10-01-0912.mp3' }) @IsString() @MaxLength(255) originalName: string;
@@ -58,6 +63,20 @@ export class RequestUploadDto {
   @IsOptional()
   @IsObject()
   attributes?: Record<string, string>;
+}
+
+export class CorrectSegmentDto {
+  @ApiProperty({ description: 'The version being looked at; it must be the latest.' })
+  @IsString()
+  transcriptId: string;
+  @ApiProperty({ example: 3 }) @IsInt() @Min(0) segmentIndex: number;
+  @ApiProperty({
+    enum: ['script', 'roman'],
+    description: 'script: as spoken, in its script. roman: the Hinglish.',
+  })
+  @IsIn(['script', 'roman'])
+  layer: Layer;
+  @ApiProperty({ description: 'What the line should read.' }) @IsString() @MaxLength(2000) text: string;
 }
 
 export class SearchQueryDto {
@@ -235,6 +254,47 @@ export class RecordingsController {
     try {
       const reply = await this.clients.transcription.getTranscript({ id: recording.latestTranscriptId });
       return { transcript: transcriptFromPb(reply.transcript!), status: recording.status };
+    } catch (error) {
+      throw fromRpc(error, 'transcription');
+    }
+  }
+
+  @Post(':id/transcript/corrections')
+  @ApiOperation({
+    summary: 'Correct one line',
+    description:
+      'Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.',
+  })
+  async correct(@CurrentUser() me: Principal, @Param('id') id: string, @Body() body: CorrectSegmentDto) {
+    const recording = await this.recordings.get(me.workspaceId, id);
+    if (recording.latestTranscriptId !== body.transcriptId)
+      throw invalid('Correct the latest version of the transcript.');
+    const text = body.text.trim();
+    if (!text) throw invalid('The corrected line is empty.');
+    try {
+      const reply = await this.clients.transcription.correctSegment({
+        transcriptId: body.transcriptId,
+        segmentIndex: body.segmentIndex,
+        layer: layerToPb(body.layer),
+        text,
+        userId: me.userId ?? '',
+        workspaceId: me.workspaceId,
+      });
+      const corrected = transcriptFromPb(reply.transcript!);
+      await this.recordings.setRecordingStatus(id, 'done', { latestTranscriptId: corrected.id });
+      return { transcript: corrected, correction: correctionFromPb(reply.correction!) };
+    } catch (error) {
+      throw fromRpc(error, 'transcription');
+    }
+  }
+
+  @Get(':id/transcript/corrections')
+  @ApiOperation({ summary: 'The corrections made to a recording', description: 'Newest first.' })
+  async corrections(@CurrentUser() me: Principal, @Param('id') id: string) {
+    await this.recordings.get(me.workspaceId, id);
+    try {
+      const reply = await this.clients.transcription.listCorrections({ recordingId: id });
+      return { items: reply.corrections.map(correctionFromPb) };
     } catch (error) {
       throw fromRpc(error, 'transcription');
     }
