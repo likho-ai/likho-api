@@ -17,6 +17,7 @@ browser ── SSE     /events ───┘               ├── likho-transc
                                               ├── likho-language      (glossary, spellings)
                                               ├── likho-search        (lines matching a few words)
                                               ├── likho-insights      (what a model says about a call)
+                                              ├── likho-analytics     (the numbers behind the calls)
                    events on NATS ────────────┤   likho.media.ready / failed
                                               │   likho.live.segment
                                               │   likho.transcription.completed / failed
@@ -44,7 +45,12 @@ file as the body), and **insights** (`insights(recordingId)` and `recording { in
 `GET /api/v1/recordings/:id/insights` - what a language model says about the call: a summary,
 the products, the customer's mood, and the auditor's form pre-filled; `analyseRecording(id, force)`
 / `POST` asks for them now; `insightsStatus` / `GET /api/v1/insights/status` says whether a model
-is configured at all, because without one nothing is analysed and no transcript text leaves).
+is configured at all, because without one nothing is analysed and no transcript text leaves), and
+**the numbers behind the calls** (`analyticsOverview(since, until, facts)`,
+`analyticsTimeseries(metric, bucket, …)`, `analyticsBreakdown(by, …)` / `GET /api/v1/analytics/{overview,timeseries,breakdown}`
+- how many calls, transcribed, failed, minutes, speed, analysed and their score, by day or hour,
+by agent, campaign, disposition, language, sentiment or source; answered by likho-analytics from
+every event on the bus).
 
 A recording's life, as the API sees it:
 
@@ -132,7 +138,7 @@ docker run --rm --network likho -p 4000:4000 \
   -e REDIS_URL=redis://redis:6379 -e NATS_URL=nats://nats:4222 \
   -e MEDIA_GRPC_ADDR=likho-media:5010 -e TRANSCRIPTION_GRPC_ADDR=likho-transcription:5020 \
   -e LANGUAGE_GRPC_ADDR=likho-language:5030 -e SEARCH_GRPC_ADDR=likho-search:5040 \
-  -e INSIGHTS_GRPC_ADDR=likho-insights:5050 \
+  -e INSIGHTS_GRPC_ADDR=likho-insights:5050 -e ANALYTICS_GRPC_ADDR=likho-analytics:5070 \
   -e BOOTSTRAP_ADMIN_EMAIL=you@example.com -e BOOTSTRAP_ADMIN_PASSWORD=choose-one \
   likho-api
 ```
@@ -199,7 +205,7 @@ ConfigMaps and Secrets.
 | `DATABASE_URL` | local stack, database `likho_api` | PostgreSQL; tables are created on start |
 | `REDIS_URL` | `redis://localhost:6380` | Live updates between instances |
 | `NATS_URL` | `nats://localhost:4222` | Event bus |
-| `MEDIA_GRPC_ADDR`, `TRANSCRIPTION_GRPC_ADDR`, `LANGUAGE_GRPC_ADDR`, `SEARCH_GRPC_ADDR`, `INSIGHTS_GRPC_ADDR` | `localhost:5010/5020/5030/5040/5050` | The other services |
+| `MEDIA_GRPC_ADDR`, `TRANSCRIPTION_GRPC_ADDR`, `LANGUAGE_GRPC_ADDR`, `SEARCH_GRPC_ADDR`, `INSIGHTS_GRPC_ADDR`, `ANALYTICS_GRPC_ADDR` | `localhost:5010/5020/5030/5040/5050/5070` | The other services |
 | `IMPORT_SOURCE` | `ameyo` | The connector that answers `requestImport` by default; empty = imports are off |
 | `PUBLIC_ORIGIN` | `http://localhost:8080` | The address browsers use; https makes cookies Secure |
 | `SESSION_SECRET` | a development value | Keys sessions and API keys; required in production |
@@ -228,6 +234,6 @@ pnpm db:generate   # a new SQL migration after a change to src/db/schema.ts
 ```
 
 The tests run the real application against PostgreSQL (each run in its own schema), NATS and
-Redis, with likho-media, likho-transcription, likho-language, likho-search and likho-insights
-replaced by small gRPC servers in the test process. Without the stack they are skipped; with `LIKHO_REQUIRE_STACK=1` (set in CI)
+Redis, with likho-media, likho-transcription, likho-language, likho-search, likho-insights and
+likho-analytics replaced by small gRPC servers in the test process. Without the stack they are skipped; with `LIKHO_REQUIRE_STACK=1` (set in CI)
 they fail instead.

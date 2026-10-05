@@ -24,6 +24,7 @@ const schema = z.object({
   LANGUAGE_GRPC_ADDR: z.string().default('localhost:5030'),
   SEARCH_GRPC_ADDR: z.string().default('localhost:5040'),
   INSIGHTS_GRPC_ADDR: z.string().default('localhost:5050'),
+  ANALYTICS_GRPC_ADDR: z.string().default('localhost:5070'),
   /** Which connector answers import requests by default ('ameyo'). Empty = imports are off. */
   IMPORT_SOURCE: z.string().default('ameyo'),
   RPC_TIMEOUT_SECONDS: seconds.default(10),

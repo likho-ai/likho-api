@@ -3,6 +3,9 @@ import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'node:path';
 import type { GraphQLFormattedError } from 'graphql';
+import { AnalyticsController } from './analytics/analytics.controller.js';
+import { AnalyticsResolver } from './analytics/analytics.resolver.js';
+import { AnalyticsService } from './analytics/analytics.service.js';
 import { AuditResolver } from './audit/audit.resolver.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BusModule } from './bus/bus.module.js';
@@ -90,6 +93,7 @@ export function appModule(config?: Config) {
       ImportsController,
       VocabularyController,
       InsightsController,
+      AnalyticsController,
       LiveController,
     ],
     providers: [
@@ -99,6 +103,7 @@ export function appModule(config?: Config) {
       SavedSearchesService,
       VocabularyService,
       InsightsService,
+      AnalyticsService,
       EventsConsumer,
       JobsSweeper,
       RecordingsResolver,
@@ -108,6 +113,7 @@ export function appModule(config?: Config) {
       TranscriptsResolver,
       VocabularyResolver,
       InsightsResolver,
+      AnalyticsResolver,
       SettingsResolver,
       UsersResolver,
       AuditResolver,

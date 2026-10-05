@@ -2,6 +2,7 @@
  * The whole service: GraphQL for browsers, REST for scripts, events from the other services,
  * live updates. Runs against the local stack; see harness.ts.
  */
+import { Bucket, Dimension, Metric } from '@likho-ai/contracts/analytics/v1/analytics_pb';
 import { newId } from '../src/common/ids.js';
 import { Browser, Harness, readEvents, requireStack, start, until } from './harness.js';
 
@@ -1522,6 +1523,125 @@ describe.skipIf(!stackUp)('likho-api', () => {
       } finally {
         h.insights.enabled = true;
       }
+    });
+  });
+
+  describe('the numbers behind the calls', () => {
+    const since = '2026-10-01T00:00:00.000Z';
+    const until = '2026-10-03T00:00:00.000Z';
+
+    it('answers an overview, a timeseries and a breakdown for the workspace and the window asked', async () => {
+      const { me } = await admin.ok(`{ me { workspace { id } } }`);
+      const { analyticsOverview } = await admin.ok(
+        `query ($since: DateTime!, $until: DateTime!) {
+          analyticsOverview(since: $since, until: $until, facts: { campaign: "sale" }) {
+            calls transcribed failed minutes realtimeFactor analysed score sentiments { key count } languages { key count }
+          }
+        }`,
+        { since, until },
+      );
+      expect(analyticsOverview).toEqual({
+        calls: 12,
+        transcribed: 10,
+        failed: 1,
+        minutes: 25.5,
+        realtimeFactor: 0.9,
+        analysed: 4,
+        score: 0.75,
+        sentiments: [
+          { key: 'positive', count: 3 },
+          { key: 'negative', count: 1 },
+        ],
+        languages: [
+          { key: 'hi', count: 8 },
+          { key: 'ur', count: 2 },
+        ],
+      });
+      expect(h.analytics.asked.at(-1)).toEqual({
+        method: 'overview',
+        workspaceId: me.workspace.id,
+        since: new Date(since),
+        until: new Date(until),
+        facts: { campaign: 'sale' },
+      });
+
+      const { analyticsTimeseries } = await admin.ok(
+        `query ($since: DateTime!, $until: DateTime!) {
+          analyticsTimeseries(metric: minutes, bucket: hour, since: $since, until: $until) { at value }
+        }`,
+        { since, until },
+      );
+      expect(analyticsTimeseries).toEqual([
+        { at: since, value: 5 },
+        { at: '2026-10-02T00:00:00.000Z', value: 7 },
+      ]);
+      expect(h.analytics.asked.at(-1)).toMatchObject({
+        method: 'timeseries',
+        metric: Metric.MINUTES,
+        bucket: Bucket.HOUR,
+      });
+
+      const { analyticsBreakdown } = await admin.ok(
+        `query ($since: DateTime!, $until: DateTime!) {
+          analyticsBreakdown(by: agent, since: $since, until: $until, limit: 10) {
+            key calls transcribed minutes analysed score negative
+          }
+        }`,
+        { since, until },
+      );
+      expect(analyticsBreakdown[0]).toEqual({
+        key: 'asha',
+        calls: 7,
+        transcribed: 7,
+        minutes: 15,
+        analysed: 3,
+        score: 0.8,
+        negative: 1,
+      });
+      expect(h.analytics.asked.at(-1)).toMatchObject({ method: 'breakdown', by: Dimension.AGENT, limit: 10 });
+
+      // A window that ends before it starts is refused here, not there.
+      expect(
+        await admin.fails(
+          `query { analyticsOverview(since: "2026-10-03T00:00:00Z", until: "2026-10-01T00:00:00Z") { calls } }`,
+        ),
+      ).toBe('invalid');
+
+      // Over REST too.
+      const headers = { cookie: admin.cookie };
+      const rest = await (
+        await fetch(`${h.url}/api/v1/analytics/overview?since=${since}&until=${until}&agent=asha`, {
+          headers,
+        })
+      ).json();
+      expect(rest).toMatchObject({
+        calls: 12,
+        languages: [
+          { key: 'hi', count: 8 },
+          { key: 'ur', count: 2 },
+        ],
+      });
+      expect(h.analytics.asked.at(-1)).toMatchObject({ facts: { agent: 'asha' } });
+      const series = await (
+        await fetch(`${h.url}/api/v1/analytics/timeseries?since=${since}&until=${until}&metric=calls`, {
+          headers,
+        })
+      ).json();
+      expect(series.points).toEqual([
+        { at: since, value: 5 },
+        { at: '2026-10-02T00:00:00.000Z', value: 7 },
+      ]);
+      const rows = await (
+        await fetch(`${h.url}/api/v1/analytics/breakdown?since=${since}&until=${until}&by=campaign&limit=5`, {
+          headers,
+        })
+      ).json();
+      expect(rows.rows).toHaveLength(2);
+      expect(h.analytics.asked.at(-1)).toMatchObject({ by: Dimension.CAMPAIGN, limit: 5 });
+      const bad = await fetch(`${h.url}/api/v1/analytics/breakdown?since=${since}&until=${until}&by=colour`, {
+        headers,
+      });
+      expect(bad.status).toBe(400);
     });
   });
 

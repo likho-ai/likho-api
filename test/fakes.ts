@@ -7,6 +7,12 @@ import { connectNodeAdapter } from '@connectrpc/connect-node';
 import { create } from '@bufbuild/protobuf';
 import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { Script } from '@likho-ai/contracts/common/v1/common_pb';
+import {
+  AnalyticsService,
+  type Bucket,
+  type Dimension,
+  type Metric,
+} from '@likho-ai/contracts/analytics/v1/analytics_pb';
 import { InsightsSchema, InsightsService } from '@likho-ai/contracts/insights/v1/insights_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
@@ -430,6 +436,96 @@ export class FakeInsights {
         model: this.enabled ? 'fake/one' : '',
         formVersion: 'example-1',
       }),
+    });
+  }
+}
+
+/** likho-analytics: canned numbers, and a record of what it was asked. */
+export class FakeAnalytics {
+  asked: {
+    method: 'overview' | 'timeseries' | 'breakdown';
+    workspaceId: string;
+    since?: Date;
+    until?: Date;
+    facts: Record<string, string>;
+    metric?: Metric;
+    bucket?: Bucket;
+    by?: Dimension;
+    limit?: number;
+  }[] = [];
+
+  routes(router: ConnectRouter) {
+    const seen = (
+      method: 'overview' | 'timeseries' | 'breakdown',
+      req: {
+        workspaceId: string;
+        window?: { since?: { seconds: bigint; nanos: number }; until?: { seconds: bigint; nanos: number } };
+        facts?: { campaign: string; agent: string; disposition: string; source: string; language: string };
+      },
+      extra: Partial<FakeAnalytics['asked'][number]> = {},
+    ) => {
+      const facts: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.facts ?? {}))
+        if (value && !key.startsWith('$')) facts[key] = value;
+      this.asked.push({
+        method,
+        workspaceId: req.workspaceId,
+        since: req.window?.since ? timestampDate(req.window.since as never) : undefined,
+        until: req.window?.until ? timestampDate(req.window.until as never) : undefined,
+        facts,
+        ...extra,
+      });
+    };
+    router.service(AnalyticsService, {
+      getOverview: (req) => {
+        seen('overview', req);
+        return {
+          overview: {
+            calls: 12n,
+            transcribed: 10n,
+            failed: 1n,
+            minutes: 25.5,
+            realtimeFactor: 0.9,
+            analysed: 4n,
+            score: 0.75,
+            sentiments: [
+              { key: 'positive', count: 3n },
+              { key: 'negative', count: 1n },
+            ],
+            languages: [
+              { key: 'hi', count: 8n },
+              { key: 'ur', count: 2n },
+            ],
+          },
+        };
+      },
+      getTimeseries: (req) => {
+        seen('timeseries', req, { metric: req.metric, bucket: req.bucket });
+        const since = req.window?.since ? timestampDate(req.window.since) : new Date(0);
+        return {
+          points: [
+            { at: timestampFromDate(since), value: 5 },
+            { at: timestampFromDate(new Date(since.getTime() + 86_400_000)), value: 7 },
+          ],
+        };
+      },
+      getBreakdown: (req) => {
+        seen('breakdown', req, { by: req.by, limit: req.limit });
+        return {
+          rows: [
+            { key: 'asha', calls: 7n, transcribed: 7n, minutes: 15, analysed: 3n, score: 0.8, negative: 1n },
+            {
+              key: 'ravi',
+              calls: 5n,
+              transcribed: 3n,
+              minutes: 10.5,
+              analysed: 1n,
+              score: 0.6,
+              negative: 0n,
+            },
+          ],
+        };
+      },
     });
   }
 }

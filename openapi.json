@@ -817,6 +817,302 @@
         ]
       }
     },
+    "/api/v1/analytics/overview": {
+      "get": {
+        "description": "Calls, transcribed, failed, minutes, speed, analysed, score, and the moods and languages.",
+        "operationId": "AnalyticsController_overview",
+        "parameters": [
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "description": "The start of the window of call time (ISO 8601), included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": true,
+            "in": "query",
+            "description": "The end of the window (ISO 8601), not included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaign",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disposition",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "required": false,
+            "in": "query",
+            "description": "The language detected (ISO 639-1).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What happened in a window",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/timeseries": {
+      "get": {
+        "operationId": "AnalyticsController_timeseries",
+        "parameters": [
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "description": "The start of the window of call time (ISO 8601), included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": true,
+            "in": "query",
+            "description": "The end of the window (ISO 8601), not included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaign",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disposition",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "required": false,
+            "in": "query",
+            "description": "The language detected (ISO 639-1).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "metric",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "calls",
+                "transcribed",
+                "minutes",
+                "realtimeFactor",
+                "analysed",
+                "score",
+                "negative"
+              ]
+            }
+          },
+          {
+            "name": "bucket",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "day",
+              "type": "string",
+              "enum": [
+                "day",
+                "hour"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One metric per day or hour across a window",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/breakdown": {
+      "get": {
+        "operationId": "AnalyticsController_breakdown",
+        "parameters": [
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "description": "The start of the window of call time (ISO 8601), included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": true,
+            "in": "query",
+            "description": "The end of the window (ISO 8601), not included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaign",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disposition",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "required": false,
+            "in": "query",
+            "description": "The language detected (ISO 639-1).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "by",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "agent",
+                "campaign",
+                "disposition",
+                "language",
+                "sentiment",
+                "source"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "At most this many rows, most calls first (default 50, at most 500).",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A window’s calls by agent, campaign, disposition, language, sentiment or source",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
     "/events/jobs/{id}": {
       "get": {
         "operationId": "LiveController_job",

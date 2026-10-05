@@ -2,6 +2,105 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+enum AnalyticsBucket {
+  day
+  hour
+}
+
+type AnalyticsCount {
+  count: Int!
+  key: String!
+}
+
+enum AnalyticsDimension {
+  agent
+  campaign
+  disposition
+  language
+  sentiment
+  source
+}
+
+"""Narrows to calls with these facts; a field left out means any."""
+input AnalyticsFacts {
+  agent: String
+  campaign: String
+  disposition: String
+
+  """The language detected (ISO 639-1)."""
+  language: String
+
+  """upload, api, or a connector’s name."""
+  source: String
+}
+
+"""
+calls that arrived; calls with a transcript; minutes of audio transcribed; seconds of work per second of audio; calls the model analysed; their mean score (0 to 1); analysed calls in a negative mood.
+"""
+enum AnalyticsMetric {
+  analysed
+  calls
+  minutes
+  negative
+  realtimeFactor
+  score
+  transcribed
+}
+
+"""What happened in a window of call time."""
+type AnalyticsOverview {
+  """Calls the model analysed."""
+  analysed: Int!
+
+  """Calls that arrived."""
+  calls: Int!
+
+  """Calls whose transcription failed and was not redone."""
+  failed: Int!
+
+  """Transcribed calls by detected language."""
+  languages: [AnalyticsCount!]!
+
+  """Minutes of audio transcribed."""
+  minutes: Float!
+
+  """Seconds of transcription per second of audio; lower is faster."""
+  realtimeFactor: Float!
+
+  """The mean score of the analysed calls, 0 to 1; 0 when none."""
+  score: Float!
+
+  """Analysed calls by sentiment."""
+  sentiments: [AnalyticsCount!]!
+
+  """Calls with a transcript."""
+  transcribed: Int!
+}
+
+"""One bucket of a timeseries."""
+type AnalyticsPoint {
+  """The start of the bucket."""
+  at: DateTime!
+  value: Float!
+}
+
+"""One line of a breakdown."""
+type AnalyticsRow {
+  analysed: Int!
+  calls: Int!
+
+  """The agent, campaign, …; "(none)" when the call had none."""
+  key: String!
+  minutes: Float!
+
+  """Analysed calls in a negative mood."""
+  negative: Int!
+
+  """The mean score of the analysed calls, 0 to 1; 0 when none."""
+  score: Float!
+  transcribed: Int!
+}
+
 type ApiKey {
   createdAt: DateTime!
   id: String!
@@ -463,6 +562,20 @@ type NewInvitation {
 }
 
 type Query {
+  """
+  The window’s calls split by agent, campaign, disposition, language, sentiment or source, most calls first.
+  """
+  analyticsBreakdown(by: AnalyticsDimension!, facts: AnalyticsFacts, limit: Int, since: DateTime!, until: DateTime!): [AnalyticsRow!]!
+
+  """
+  What happened to the calls made between since (included) and until (not): how many, transcribed, minutes, speed, analysed, score, moods and languages.
+  """
+  analyticsOverview(facts: AnalyticsFacts, since: DateTime!, until: DateTime!): AnalyticsOverview!
+
+  """
+  One metric per day (or hour) across the window, empty buckets at 0; a chart.
+  """
+  analyticsTimeseries(bucket: AnalyticsBucket, facts: AnalyticsFacts, metric: AnalyticsMetric!, since: DateTime!, until: DateTime!): [AnalyticsPoint!]!
   apiKeys: [ApiKey!]!
 
   """Who changed what, newest first."""

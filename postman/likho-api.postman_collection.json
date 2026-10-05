@@ -1,7 +1,7 @@
 {
   "item": [
     {
-      "id": "0d9a7b08-6ea4-41c0-85ff-3a5c90bb3653",
+      "id": "fc6fc343-8baf-463c-9c53-632f038581b9",
       "name": "Health",
       "description": {
         "content": "",
@@ -9,7 +9,7 @@
       },
       "item": [
         {
-          "id": "b68123de-d719-4e8f-bab5-d42ff16a25a5",
+          "id": "8386353b-ac58-4883-b289-c6281b75e774",
           "name": "Health Controller alive",
           "request": {
             "name": "Health Controller alive",
@@ -29,7 +29,7 @@
           },
           "response": [
             {
-              "id": "18cab083-304e-4eb5-98fa-952e99626428",
+              "id": "e95d3a4e-4858-4e85-b30d-b128824ff054",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -63,7 +63,7 @@
           }
         },
         {
-          "id": "23f07713-f350-4b37-a894-673579d48fa3",
+          "id": "c5e62ea0-efab-4b3d-bcb3-63e417690da2",
           "name": "Health Controller ready",
           "request": {
             "name": "Health Controller ready",
@@ -83,7 +83,7 @@
           },
           "response": [
             {
-              "id": "7fb59f03-202b-4b9f-a1dd-4c2df7941107",
+              "id": "2ff1966f-144d-4978-a600-61d40b32ad57",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -120,7 +120,7 @@
       "event": []
     },
     {
-      "id": "0f41ba51-61f3-43a4-a9a9-366156627fdb",
+      "id": "f1d2d48f-8171-4bc8-8533-f1529fe0dd25",
       "name": "recordings",
       "description": {
         "content": "",
@@ -128,7 +128,7 @@
       },
       "item": [
         {
-          "id": "98bc531f-4370-4d56-9f8d-7cae69b01a34",
+          "id": "2f1cbe44-27e2-4a81-90cc-2491e4c92aa5",
           "name": "Start an upload",
           "request": {
             "name": "Start an upload",
@@ -176,7 +176,7 @@
           },
           "response": [
             {
-              "id": "b6377d9a-a910-436d-b39e-de8e2a0c5861",
+              "id": "b8440a0d-d9f5-4c1c-ab43-47ac8925b56c",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -230,7 +230,7 @@
           }
         },
         {
-          "id": "6d2a4842-8251-43c3-b28c-a733ebf17beb",
+          "id": "3e9d1d65-4224-476e-805e-c68505543829",
           "name": "List recordings",
           "request": {
             "name": "List recordings",
@@ -285,7 +285,7 @@
           },
           "response": [
             {
-              "id": "4f543aa4-12fe-4f6f-b506-8d1e6705f0a0",
+              "id": "b0ecc6fb-58af-496b-8485-e3f22b209499",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -348,7 +348,7 @@
           }
         },
         {
-          "id": "776c488a-a91b-485a-b080-93656fbb15e2",
+          "id": "51684766-39a6-425c-ac03-6644e8a930fe",
           "name": "One recording",
           "request": {
             "name": "One recording",
@@ -387,7 +387,7 @@
           },
           "response": [
             {
-              "id": "fdda62c2-9ad6-47ad-ab3e-c28071fc2a81",
+              "id": "4957859e-ed0b-4b35-b274-4923c4a0c2e2",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -442,7 +442,7 @@
           }
         },
         {
-          "id": "bd1a00c0-8c4b-44f7-b618-d4f5777529aa",
+          "id": "42e425b6-274b-419c-b5dd-33c3c80b7138",
           "name": "Delete a recording, its audio and its jobs",
           "request": {
             "name": "Delete a recording, its audio and its jobs",
@@ -481,7 +481,7 @@
           },
           "response": [
             {
-              "id": "f64f2cbe-f94a-4a00-aca2-d88513a2bfb9",
+              "id": "6d8af775-2399-4cdb-b693-1436cf74b865",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -536,7 +536,7 @@
           }
         },
         {
-          "id": "9a918b86-85c5-448d-8345-20cb9d67398e",
+          "id": "0bc2b02b-910b-418f-9fed-2448593d4753",
           "name": "A short-lived link to the audio a browser plays",
           "request": {
             "name": "A short-lived link to the audio a browser plays",
@@ -576,7 +576,7 @@
           },
           "response": [
             {
-              "id": "915bfb3c-6e0a-49e8-a1d8-3ffa1ec6bf8d",
+              "id": "981efdd8-4433-4dc1-a96d-ad3030a184c7",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -632,7 +632,7 @@
           }
         },
         {
-          "id": "d8cd525e-873b-43ed-b3e6-3c2ffae05aa1",
+          "id": "a8d5797e-2886-48e4-8acb-cf362fac0c40",
           "name": "The newest transcript",
           "request": {
             "name": "The newest transcript",
@@ -675,7 +675,7 @@
           },
           "response": [
             {
-              "id": "f5a52850-84fe-48f8-81cb-abe5f49d68df",
+              "id": "99fdb868-282b-4527-8a2b-cb8cab94f594",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -731,7 +731,7 @@
           }
         },
         {
-          "id": "33092405-50e6-4bdd-85ab-7b1296aa7779",
+          "id": "9f79a53b-47bc-4636-bb2f-c0f0529d586b",
           "name": "Correct one line",
           "request": {
             "name": "Correct one line",
@@ -790,7 +790,7 @@
           },
           "response": [
             {
-              "id": "492e6df7-111b-4b55-8c00-d34669694043",
+              "id": "b45cd6dc-0b1b-4da0-90af-4bbb565c27c1",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -855,7 +855,7 @@
           }
         },
         {
-          "id": "c007226e-7f39-47f0-b3a1-14efbd03226d",
+          "id": "a0b3b7c1-f342-41f3-83d4-905485e8017d",
           "name": "The corrections made to a recording",
           "request": {
             "name": "The corrections made to a recording",
@@ -899,7 +899,7 @@
           },
           "response": [
             {
-              "id": "5cea9bbf-721c-424b-b8b6-d2f1968b7e84",
+              "id": "45a5dfdb-9e91-45f4-adf5-dcd19c71c971",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -956,7 +956,7 @@
           }
         },
         {
-          "id": "b1c881ee-b6d5-4a61-aea5-53ec523cc2d1",
+          "id": "a72dfa32-8985-495f-b13f-7198f9c43310",
           "name": "Queue a transcription",
           "request": {
             "name": "Queue a transcription",
@@ -1011,7 +1011,7 @@
           },
           "response": [
             {
-              "id": "3b75d1fd-e4b3-40ea-8e02-7a5ea907606c",
+              "id": "43267142-86ab-4d90-ae43-931d25e8ba0f",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1075,7 +1075,7 @@
           }
         },
         {
-          "id": "fb01157c-e7d9-4ac3-9a4d-edd5950ab4c2",
+          "id": "1048184b-133f-4569-b607-fb082986ca57",
           "name": "The jobs of a recording, newest first",
           "request": {
             "name": "The jobs of a recording, newest first",
@@ -1115,7 +1115,7 @@
           },
           "response": [
             {
-              "id": "e4c38023-32c7-4da9-88cd-ccc6703778fd",
+              "id": "b01ebbf3-4554-479d-b4f5-ef536befddbb",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1174,7 +1174,7 @@
       "event": []
     },
     {
-      "id": "58e6c3fd-53fb-45e6-ba53-97903c13b115",
+      "id": "dfb779be-c39b-45b5-858c-912e2e510f9b",
       "name": "jobs",
       "description": {
         "content": "",
@@ -1182,7 +1182,7 @@
       },
       "item": [
         {
-          "id": "1d1e2593-e62c-42e3-8f09-2fa9db75a81a",
+          "id": "22142fa4-91cc-4b12-98a1-8cad0248ac4c",
           "name": "One job",
           "request": {
             "name": "One job",
@@ -1221,7 +1221,7 @@
           },
           "response": [
             {
-              "id": "08dbeb3f-053a-4b3c-9c18-aadf7baa9397",
+              "id": "0472912b-8d3d-4429-91df-73f2734912c2",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1276,7 +1276,7 @@
           }
         },
         {
-          "id": "9c028b84-b8a6-41d8-af03-4a6066989230",
+          "id": "b44166e6-d68e-4a70-8af7-10570ada262d",
           "name": "Stop a waiting or running job",
           "request": {
             "name": "Stop a waiting or running job",
@@ -1316,7 +1316,7 @@
           },
           "response": [
             {
-              "id": "b67f6749-3ae1-4070-884c-410859ad3911",
+              "id": "51c35fd6-0d22-4d41-b52d-f3fe66791152",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1375,7 +1375,7 @@
       "event": []
     },
     {
-      "id": "0fa4d6a6-0eb8-4986-93be-13b2eeb19966",
+      "id": "08fe192c-4a03-4def-b15e-e4c18f70d7a2",
       "name": "search",
       "description": {
         "content": "",
@@ -1383,7 +1383,7 @@
       },
       "item": [
         {
-          "id": "539665a2-1866-4cbe-98b6-52b1b8a758fe",
+          "id": "ebaed59f-8edd-4eb1-b13e-c7cccb843579",
           "name": "Search every transcript line",
           "request": {
             "name": "Search every transcript line",
@@ -1457,7 +1457,7 @@
           },
           "response": [
             {
-              "id": "d74eb7e1-09ba-4f41-8e57-fc5db27c79dd",
+              "id": "ebff2f19-a527-43e6-90c5-b69623436165",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1535,7 +1535,7 @@
       "event": []
     },
     {
-      "id": "2f673b09-2373-4f91-8eac-f54c4e429e78",
+      "id": "786104e7-11cb-45a6-86cb-f8063f20358f",
       "name": "imports",
       "description": {
         "content": "",
@@ -1543,7 +1543,7 @@
       },
       "item": [
         {
-          "id": "240dfbca-94a6-4274-8173-fc42c8c40fe5",
+          "id": "d0eacf87-8fe7-418d-beda-fab1171b43d7",
           "name": "Fetch a call from the dialer by its id",
           "request": {
             "name": "Fetch a call from the dialer by its id",
@@ -1591,7 +1591,7 @@
           },
           "response": [
             {
-              "id": "6b813fb8-958b-44ac-a2ea-9f423f3467c9",
+              "id": "3d0c91c3-1e41-47cf-8a07-8bd24615f225",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1645,7 +1645,7 @@
           }
         },
         {
-          "id": "45f85e8e-2a45-4d02-8f86-f8d7e2b8c263",
+          "id": "7210f51d-f019-4374-b6c9-5afa8af40652",
           "name": "List imports",
           "request": {
             "name": "List imports",
@@ -1695,7 +1695,7 @@
           },
           "response": [
             {
-              "id": "36c17f31-e4ce-4231-9c25-787ca546cb34",
+              "id": "367e95db-d364-4a46-a0f8-0fede5425d41",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1754,7 +1754,7 @@
           }
         },
         {
-          "id": "96cf6db7-ed98-41ef-a186-eecd6b195d5a",
+          "id": "f3e740ed-76a5-49a7-97b8-a662638197ce",
           "name": "One import",
           "request": {
             "name": "One import",
@@ -1793,7 +1793,7 @@
           },
           "response": [
             {
-              "id": "b469dba5-e1ca-4274-bff3-6ddd9dcd8ebb",
+              "id": "a3eed569-deb5-4d25-9ad1-382a887962a7",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1851,7 +1851,7 @@
       "event": []
     },
     {
-      "id": "e8ab08f9-be7b-4b78-9d3b-da24f9cf0bc2",
+      "id": "7006c623-0335-4174-81e9-b83ed5ca0ac4",
       "name": "vocabulary",
       "description": {
         "content": "",
@@ -1859,7 +1859,7 @@
       },
       "item": [
         {
-          "id": "5af1e8e6-e3c5-4709-89b6-850508ce3c6a",
+          "id": "91b915f0-bbb5-4655-95bf-7560a94b8940",
           "name": "The glossary as CSV: term, language, enabled, note, heard, last_heard_at",
           "request": {
             "name": "The glossary as CSV: term, language, enabled, note, heard, last_heard_at",
@@ -1890,7 +1890,7 @@
           },
           "response": [
             {
-              "id": "7b904e3e-94a5-4608-8476-621c8256afb9",
+              "id": "b919a36f-370a-4e63-b625-046f15b1cb80",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -1937,7 +1937,7 @@
           }
         },
         {
-          "id": "676947fd-24c6-44ba-9c78-eca1fa7f3a43",
+          "id": "a03f54a6-e262-4292-b5a0-c215f91af00e",
           "name": "Load terms from CSV",
           "request": {
             "name": "Load terms from CSV",
@@ -1981,7 +1981,7 @@
           },
           "response": [
             {
-              "id": "3ff92eee-32c9-4c90-a4c5-a092cc136017",
+              "id": "aeec7c76-6f99-4248-a2e9-ddf9a106e90a",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2031,7 +2031,7 @@
           }
         },
         {
-          "id": "08270f51-ac58-4a29-8611-7bde96dc3a7c",
+          "id": "92ad9b6f-018e-4ce5-8731-6deab9d5a825",
           "name": "The spellings as CSV: source, target, enabled, applied, last_applied_at",
           "request": {
             "name": "The spellings as CSV: source, target, enabled, applied, last_applied_at",
@@ -2062,7 +2062,7 @@
           },
           "response": [
             {
-              "id": "c8e16d0b-a7c2-4abe-af28-1d274102c6d0",
+              "id": "dd3ab08e-e778-49ed-9585-66a5874b058b",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2109,7 +2109,7 @@
           }
         },
         {
-          "id": "d7a0bdc7-f518-4d5b-82d8-574400624600",
+          "id": "c072efb3-bf19-4c55-b24b-c08ab83cd472",
           "name": "Load spellings from CSV",
           "request": {
             "name": "Load spellings from CSV",
@@ -2153,7 +2153,7 @@
           },
           "response": [
             {
-              "id": "0fe17fd7-7cc6-483d-8c0e-316868873f88",
+              "id": "7aa12c9a-c847-4bde-9115-3cb24a52b9ba",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2206,7 +2206,7 @@
       "event": []
     },
     {
-      "id": "4e9764c2-b7db-47ec-a619-57d564feacf2",
+      "id": "6642ae22-9f41-44e5-a941-e42ef0182365",
       "name": "insights",
       "description": {
         "content": "",
@@ -2214,7 +2214,7 @@
       },
       "item": [
         {
-          "id": "8d571626-eb62-4722-95e3-e839ac54e0a7",
+          "id": "86d2b565-a111-4895-9c1e-82bfc3e1878b",
           "name": "The insights of a recording",
           "request": {
             "name": "The insights of a recording",
@@ -2257,7 +2257,7 @@
           },
           "response": [
             {
-              "id": "cf899386-3627-42a6-bca8-f147d3aa62f2",
+              "id": "5fe55a43-58b7-42be-be08-ab7104350250",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2313,7 +2313,7 @@
           }
         },
         {
-          "id": "8b05bacf-3fb3-4609-ad22-12df8fe547ed",
+          "id": "ca40e684-26fe-440d-a3bd-6919844e443a",
           "name": "Analyse a recording now",
           "request": {
             "name": "Analyse a recording now",
@@ -2371,7 +2371,7 @@
           },
           "response": [
             {
-              "id": "cd098de7-cb13-4d95-af92-fb61f185b2eb",
+              "id": "8c65db42-5d03-4377-81ef-602a91cdab02",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2435,7 +2435,7 @@
           }
         },
         {
-          "id": "3cd5785e-0dfd-4035-bdeb-5b7ca673af9f",
+          "id": "e71c7adf-a4c9-450e-89b1-24c29d451373",
           "name": "Whether insights are made at all",
           "request": {
             "name": "Whether insights are made at all",
@@ -2469,7 +2469,7 @@
           },
           "response": [
             {
-              "id": "62abe25e-9534-4bf0-a260-502ea9d9c31b",
+              "id": "981d7b05-e64a-42f4-bc49-debcd5685ce9",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2519,7 +2519,498 @@
       "event": []
     },
     {
-      "id": "fed30fd4-2b85-4c39-9ce1-3fbb47c91865",
+      "id": "8dc710ff-7018-4d29-896c-2f4426b51e2e",
+      "name": "analytics",
+      "description": {
+        "content": "",
+        "type": "text/plain"
+      },
+      "item": [
+        {
+          "id": "02c2323e-abce-4f98-a34c-897d3ccc0292",
+          "name": "What happened in a window",
+          "request": {
+            "name": "What happened in a window",
+            "description": {
+              "content": "Calls, transcribed, failed, minutes, speed, analysed, score, and the moods and languages.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "overview"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [
+                {
+                  "disabled": false,
+                  "key": "since",
+                  "value": "<string>",
+                  "description": "(Required) The start of the window of call time (ISO 8601), included."
+                },
+                {
+                  "disabled": false,
+                  "key": "until",
+                  "value": "<string>",
+                  "description": "(Required) The end of the window (ISO 8601), not included."
+                },
+                {
+                  "disabled": false,
+                  "key": "campaign",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "agent",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "disposition",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "source",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "language",
+                  "value": "<string>",
+                  "description": "The language detected (ISO 639-1)."
+                }
+              ],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "e0199d48-9e71-4edd-9648-cb203c296d02",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "analytics",
+                    "overview"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "since",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "until",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "campaign",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "agent",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "disposition",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "source",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "language",
+                      "value": "<string>"
+                    }
+                  ],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        },
+        {
+          "id": "0fc3788c-f134-40b4-af82-f189e4c99a4c",
+          "name": "One metric per day or hour across a window",
+          "request": {
+            "name": "One metric per day or hour across a window",
+            "description": {},
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "timeseries"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [
+                {
+                  "disabled": false,
+                  "key": "since",
+                  "value": "<string>",
+                  "description": "(Required) The start of the window of call time (ISO 8601), included."
+                },
+                {
+                  "disabled": false,
+                  "key": "until",
+                  "value": "<string>",
+                  "description": "(Required) The end of the window (ISO 8601), not included."
+                },
+                {
+                  "disabled": false,
+                  "key": "campaign",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "agent",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "disposition",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "source",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "language",
+                  "value": "<string>",
+                  "description": "The language detected (ISO 639-1)."
+                },
+                {
+                  "disabled": false,
+                  "key": "metric",
+                  "value": "<string>",
+                  "description": "(Required) "
+                },
+                {
+                  "disabled": false,
+                  "key": "bucket",
+                  "value": "day"
+                }
+              ],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "1e78b8ec-2bff-4796-9c0f-3d60d4106e72",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "analytics",
+                    "timeseries"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "since",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "until",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "campaign",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "agent",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "disposition",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "source",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "language",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "metric",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "bucket",
+                      "value": "day"
+                    }
+                  ],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        },
+        {
+          "id": "c942f4a9-d913-4399-ad05-3853baafe6c8",
+          "name": "A window’s calls by agent, campaign, disposition, language, sentiment or source",
+          "request": {
+            "name": "A window’s calls by agent, campaign, disposition, language, sentiment or source",
+            "description": {},
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "breakdown"
+              ],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "query": [
+                {
+                  "disabled": false,
+                  "key": "since",
+                  "value": "<string>",
+                  "description": "(Required) The start of the window of call time (ISO 8601), included."
+                },
+                {
+                  "disabled": false,
+                  "key": "until",
+                  "value": "<string>",
+                  "description": "(Required) The end of the window (ISO 8601), not included."
+                },
+                {
+                  "disabled": false,
+                  "key": "campaign",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "agent",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "disposition",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "source",
+                  "value": "<string>"
+                },
+                {
+                  "disabled": false,
+                  "key": "language",
+                  "value": "<string>",
+                  "description": "The language detected (ISO 639-1)."
+                },
+                {
+                  "disabled": false,
+                  "key": "by",
+                  "value": "<string>",
+                  "description": "(Required) "
+                },
+                {
+                  "disabled": false,
+                  "key": "limit",
+                  "value": "<number>",
+                  "description": "At most this many rows, most calls first (default 50, at most 500)."
+                }
+              ],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearerToken}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "6cb5a658-27fd-4c1a-96b2-4a04e3968483",
+              "originalRequest": {
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "analytics",
+                    "breakdown"
+                  ],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "since",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "until",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "campaign",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "agent",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "disposition",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "source",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "language",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "by",
+                      "value": "<string>"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "<number>"
+                    }
+                  ],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "description": {
+                      "content": "Added as a part of security scheme: bearer",
+                      "type": "text/plain"
+                    },
+                    "key": "Authorization",
+                    "value": "Bearer <token>"
+                  }
+                ],
+                "method": "GET",
+                "body": {}
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "",
+              "cookie": [],
+              "_postman_previewlanguage": "text"
+            }
+          ],
+          "event": [],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          }
+        }
+      ],
+      "event": []
+    },
+    {
+      "id": "ad513346-dc48-4f37-8dcf-041ccec1b746",
       "name": "Live",
       "description": {
         "content": "",
@@ -2527,7 +3018,7 @@
       },
       "item": [
         {
-          "id": "0704b989-0702-49f1-8858-09bf518b639b",
+          "id": "05687559-6b2d-4e96-9423-c4b1a5f8ed9f",
           "name": "Live Controller job",
           "request": {
             "name": "Live Controller job",
@@ -2557,7 +3048,7 @@
           },
           "response": [
             {
-              "id": "3e6ad88a-bea4-487c-a00d-6a6c7a843aab",
+              "id": "c4bd596b-77f1-4fb4-b500-cbca60e7c914",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2601,7 +3092,7 @@
           }
         },
         {
-          "id": "32ba05c4-839c-423c-acdc-bf0322b3586e",
+          "id": "d98e9944-293b-4d66-a88c-2b3e49d058f1",
           "name": "Live Controller recording",
           "request": {
             "name": "Live Controller recording",
@@ -2631,7 +3122,7 @@
           },
           "response": [
             {
-              "id": "913f6275-bdf0-443a-9cff-a26a816a8a02",
+              "id": "5f4262ec-4842-45d8-9600-8012423c6175",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2675,7 +3166,7 @@
           }
         },
         {
-          "id": "e89430f6-a41b-4884-b624-8f1b73894170",
+          "id": "6d2eb02b-ffe3-4097-9784-4139c73389e6",
           "name": "Live Controller workspace",
           "request": {
             "name": "Live Controller workspace",
@@ -2696,7 +3187,7 @@
           },
           "response": [
             {
-              "id": "5704ef97-1e61-45d7-9229-e3cf381c0494",
+              "id": "32a82176-6a81-46b0-92c1-00e0f9b1eafe",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2734,7 +3225,7 @@
       "event": []
     },
     {
-      "id": "50244a43-13f4-4fc4-8693-a0cae9aec31c",
+      "id": "30318816-b97a-4d5d-8e89-93533c87f06c",
       "name": "Metrics",
       "description": {
         "content": "",
@@ -2742,7 +3233,7 @@
       },
       "item": [
         {
-          "id": "c1ca8609-610c-4d1c-8f32-b017c9158d28",
+          "id": "1a855f25-b002-434f-9140-5fe59748a823",
           "name": "Metrics Controller scrape",
           "request": {
             "name": "Metrics Controller scrape",
@@ -2762,7 +3253,7 @@
           },
           "response": [
             {
-              "id": "5d334970-c96d-4cee-9975-44972794e3e0",
+              "id": "68374153-9705-40d0-b758-00ba68a77b01",
               "originalRequest": {
                 "url": {
                   "path": [
@@ -2808,7 +3299,7 @@
     }
   ],
   "info": {
-    "_postman_id": "ed8988ce-de0c-420f-899b-6e522bf9e2ed",
+    "_postman_id": "4621ab4a-5e6d-4f9c-8789-fad9bb514be8",
     "name": "Likho API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": {
