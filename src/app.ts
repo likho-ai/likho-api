@@ -10,6 +10,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { appModule } from './app.module.js';
@@ -46,7 +47,11 @@ class RestErrorFilter implements ExceptionFilter {
 }
 
 export async function createApp(config?: Config): Promise<INestApplication> {
-  const app = await NestFactory.create(appModule(config), { logger: ['log', 'warn', 'error'] });
+  const app = await NestFactory.create<NestExpressApplication>(appModule(config), {
+    logger: ['log', 'warn', 'error'],
+  });
+  // The vocabulary CSV endpoints take the file as the body.
+  app.useBodyParser('text', { type: ['text/csv', 'text/plain'], limit: '5mb' });
   app.useGlobalPipes(
     new ValidationPipe({
       // GraphQL refuses unknown fields itself; whitelisting would strip the fields of input types.

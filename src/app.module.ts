@@ -32,7 +32,9 @@ import { SearchService } from './search/search.service.js';
 import { SettingsResolver } from './settings/settings.resolver.js';
 import { TranscriptsResolver } from './transcripts/transcripts.resolver.js';
 import { UsersResolver } from './users/users.resolver.js';
+import { VocabularyController } from './vocabulary/vocabulary.controller.js';
 import { VocabularyResolver } from './vocabulary/vocabulary.resolver.js';
+import { VocabularyService } from './vocabulary/vocabulary.service.js';
 
 /** GraphQL errors carry the same code as REST errors, in extensions.code. */
 export function formatGraphQLError(formatted: GraphQLFormattedError, error: unknown): GraphQLFormattedError {
@@ -82,12 +84,14 @@ export function appModule(config?: Config) {
       JobsController,
       SearchController,
       ImportsController,
+      VocabularyController,
       LiveController,
     ],
     providers: [
       RecordingsService,
       ImportsService,
       SearchService,
+      VocabularyService,
       EventsConsumer,
       JobsSweeper,
       RecordingsResolver,

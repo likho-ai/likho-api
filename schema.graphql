@@ -112,9 +112,18 @@ type Engine {
 
 type GlossaryTerm {
   enabled: Boolean!
+
+  """How many transcript lines contained the term."""
+  heard: Int!
   id: String!
+
+  """Several words: matched as a whole, and a multi-word hotword."""
+  isPhrase: Boolean!
   language: String!
+  lastHeardAt: DateTime
   note: String!
+
+  """A name, or a whole phrase, in the script of the audio."""
   term: String!
 }
 
@@ -153,6 +162,11 @@ type Import {
 type ImportPage {
   hasMore: Boolean!
   items: [Import!]!
+}
+
+type ImportResult {
+  added: Int!
+  updated: Int!
 }
 
 enum ImportStatus {
@@ -281,6 +295,16 @@ type Mutation {
   enableUser(userId: String!): User!
 
   """
+  Many terms from CSV. The first line names the columns: term (required), language, enabled, note. A term already there is updated.
+  """
+  importGlossaryCsv(csv: String!): ImportResult!
+
+  """
+  Many spellings from CSV. The first line names the columns: source and target (required), enabled. A source already there is updated.
+  """
+  importSpellingsCsv(csv: String!): ImportResult!
+
+  """
   Invites a person by email: a one-time link, good for seven days, mailed when mail is set up and returned to you either way.
   """
   inviteUser(input: InviteUserInput!): NewInvitation!
@@ -356,6 +380,11 @@ type Query {
   """The speech models a worker can run."""
   engines: [Engine!]!
   glossary: [GlossaryTerm!]!
+
+  """
+  The glossary as CSV: term, language, enabled, note, heard, last_heard_at.
+  """
+  glossaryCsv: String!
   import(id: String!): Import!
 
   """Calls asked for from the dialer, newest first."""
@@ -387,6 +416,11 @@ type Query {
   search(filter: SearchFilter, page: Int, pageSize: Int, query: String!): SearchPage!
   settings: Settings!
   spellings: [Spelling!]!
+
+  """
+  The spellings as CSV: source, target, enabled, applied, last_applied_at.
+  """
+  spellingsCsv: String!
 
   """One transcript with every line, both layers."""
   transcript(id: String!): Transcript!
@@ -565,15 +599,32 @@ type Settings {
 }
 
 type Spelling {
+  """How many transcript lines the spelling was applied to."""
+  applied: Int!
   enabled: Boolean!
+
+  """The last few lines it was applied to, newest first."""
+  examples: [SpellingExample!]!
   id: String!
   isPhrase: Boolean!
+  lastAppliedAt: DateTime
 
   """What the model writes, in the source script."""
   source: String!
 
   """How it must appear in Hinglish."""
   target: String!
+}
+
+type SpellingExample {
+  """The line as it was written in Hinglish."""
+  after: String!
+
+  """The line as the model wrote it."""
+  before: String!
+  heardAt: DateTime
+  recordingId: String!
+  segmentIndex: Int!
 }
 
 input SpellingInput {

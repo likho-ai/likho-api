@@ -628,6 +628,106 @@
         ]
       }
     },
+    "/api/v1/vocabulary/glossary.csv": {
+      "get": {
+        "operationId": "VocabularyController_glossary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The glossary as CSV: term, language, enabled, note, heard, last_heard_at",
+        "tags": [
+          "vocabulary"
+        ]
+      },
+      "post": {
+        "description": "Columns: term (required), language, enabled, note. A term already there is updated.",
+        "operationId": "VocabularyController_importGlossary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "The CSV; the first line names the columns.",
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Load terms from CSV",
+        "tags": [
+          "vocabulary"
+        ]
+      }
+    },
+    "/api/v1/vocabulary/spellings.csv": {
+      "get": {
+        "operationId": "VocabularyController_spellings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The spellings as CSV: source, target, enabled, applied, last_applied_at",
+        "tags": [
+          "vocabulary"
+        ]
+      },
+      "post": {
+        "description": "Columns: source and target (required), enabled. A source already there is updated.",
+        "operationId": "VocabularyController_importSpellings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "The CSV; the first line names the columns.",
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Load spellings from CSV",
+        "tags": [
+          "vocabulary"
+        ]
+      }
+    },
     "/events/jobs/{id}": {
       "get": {
         "operationId": "LiveController_job",

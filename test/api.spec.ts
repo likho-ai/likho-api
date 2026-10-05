@@ -1074,6 +1074,109 @@ describe.skipIf(!stackUp)('likho-api', () => {
         'invalid',
       );
     });
+
+    it('counts and examples come back from likho-language, and CSV goes in and out', async () => {
+      const { upsertGlossaryTerm: phrase } = await admin.ok(
+        `mutation { upsertGlossaryTerm(input: { term: "Triphala Churna", language: "en" }) { id isPhrase heard lastHeardAt } }`,
+      );
+      expect(phrase).toMatchObject({ isPhrase: true, heard: 0, lastHeardAt: null });
+      const { upsertSpelling: spelt } = await admin.ok(
+        `mutation { upsertSpelling(input: { source: "नीम", target: "Neem" }) { id applied examples { before } } }`,
+      );
+      expect(spelt).toMatchObject({ applied: 0, examples: [] });
+
+      // likho-language heard them.
+      const term = h.language.terms.get(phrase.id)!;
+      term.heard = 3n;
+      term.lastHeardAt = { seconds: 1791183600n, nanos: 0 }; // 2026-10-05T07:00:00Z
+      const spelling = h.language.spellings.get(spelt.id)!;
+      spelling.applied = 2n;
+      spelling.examples = [
+        {
+          recordingId: 'rec_01JB7Z5K3M9Q2W4X6Y8A0C1E3G',
+          segmentIndex: 4,
+          before: 'नीम लीजिए',
+          after: 'Neem lijiye',
+          heardAt: { seconds: 1791183840n, nanos: 0 },
+        },
+      ];
+      const { glossary, spellings } = await admin.ok(
+        `{ glossary { term heard lastHeardAt isPhrase } spellings { source applied lastAppliedAt examples { recordingId segmentIndex before after heardAt } } }`,
+      );
+      expect(glossary.find((t: any) => t.term === 'Triphala Churna')).toEqual({
+        term: 'Triphala Churna',
+        heard: 3,
+        lastHeardAt: '2026-10-05T07:00:00.000Z',
+        isPhrase: true,
+      });
+      expect(spellings.find((s: any) => s.source === 'नीम')).toEqual({
+        source: 'नीम',
+        applied: 2,
+        lastAppliedAt: null,
+        examples: [
+          {
+            recordingId: 'rec_01JB7Z5K3M9Q2W4X6Y8A0C1E3G',
+            segmentIndex: 4,
+            before: 'नीम लीजिए',
+            after: 'Neem lijiye',
+            heardAt: '2026-10-05T07:04:00.000Z',
+          },
+        ],
+      });
+
+      // CSV in: the first line names the columns; an entry already there is updated.
+      const { importGlossaryCsv } = await admin.ok(
+        `mutation ($csv: String!) { importGlossaryCsv(csv: $csv) { added updated } }`,
+        {
+          csv: 'term,language,enabled,note\r\nअश्वगंधा,hi,true,a herb\r\n"Triphala Churna",en,yes,"powder, mixed"\r\n',
+        },
+      );
+      expect(importGlossaryCsv).toEqual({ added: 1, updated: 1 });
+      const { importSpellingsCsv } = await admin.ok(
+        `mutation ($csv: String!) { importSpellingsCsv(csv: $csv) { added updated } }`,
+        { csv: 'source,target\nनीम,Neem leaf\nकल तक,by tomorrow\n' },
+      );
+      expect(importSpellingsCsv).toEqual({ added: 1, updated: 1 });
+      expect(
+        await admin.fails(`mutation ($csv: String!) { importGlossaryCsv(csv: $csv) { added } }`, {
+          csv: 'language,note\nhi,x',
+        }),
+      ).toBe('invalid');
+
+      // CSV out, with the counts.
+      const { glossaryCsv, spellingsCsv } = await admin.ok(`{ glossaryCsv spellingsCsv }`);
+      expect(glossaryCsv.split('\r\n')[0]).toBe('term,language,enabled,note,heard,last_heard_at');
+      expect(glossaryCsv).toContain('Triphala Churna,en,true,"powder, mixed",3,2026-10-05T07:00:00.000Z');
+      expect(glossaryCsv).toContain('अश्वगंधा,hi,true,a herb,0,');
+      expect(spellingsCsv.split('\r\n')[0]).toBe('source,target,enabled,applied,last_applied_at');
+      expect(spellingsCsv).toContain('नीम,Neem leaf,true,2,');
+      expect(spellingsCsv).toContain('कल तक,by tomorrow,true,0,');
+    });
+
+    it('the CSV also goes through the REST API with a key', async () => {
+      const { createApiKey } = await admin.ok(`mutation { createApiKey(name: "vocabulary script") { key } }`);
+      const headers = { authorization: `Bearer ${createApiKey.key}` };
+      const loaded = await fetch(`${h.url}/api/v1/vocabulary/spellings.csv`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'text/csv; charset=utf-8' },
+        body: 'source,target,enabled\nतुलसी,Tulsi,true\n',
+      });
+      expect(loaded.status).toBe(200);
+      expect(await loaded.json()).toEqual({ added: 1, updated: 0 });
+      const out = await fetch(`${h.url}/api/v1/vocabulary/spellings.csv`, { headers });
+      expect(out.status).toBe(200);
+      expect(out.headers.get('content-type')).toContain('text/csv');
+      expect(await out.text()).toContain('तुलसी,Tulsi,true,0,');
+      const glossary = await fetch(`${h.url}/api/v1/vocabulary/glossary.csv`, { headers });
+      expect((await glossary.text()).split('\r\n')[0]).toBe('term,language,enabled,note,heard,last_heard_at');
+      const bad = await fetch(`${h.url}/api/v1/vocabulary/glossary.csv`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'text/csv' },
+        body: 'note\nx',
+      });
+      expect(bad.status).toBe(400);
+      expect((await bad.json()).error.code).toBe('invalid');
+    });
   });
 
   describe('the audit log', () => {
@@ -1103,7 +1206,9 @@ describe.skipIf(!stackUp)('likho-api', () => {
         'user.password_changed',
         'user.password_reset',
         'glossary.added',
+        'glossary.imported',
         'spelling.added',
+        'spelling.imported',
         'spelling.deleted',
       ]) {
         expect(actions, action).toContain(action);

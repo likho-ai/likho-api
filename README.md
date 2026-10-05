@@ -26,10 +26,14 @@ browser ── SSE     /events ───┘               ├── likho-transc
 ```
 
 Beyond uploads: **search** (`search(query)` / `GET /api/v1/search?q=` - every transcript line,
-either layer, typos allowed, matches marked, each hit with its recording) and **imports**
+either layer, typos allowed, matches marked, each hit with its recording), **imports**
 (`requestImport(externalId)` / `POST /api/v1/imports` - a call asked for by its id in the
 dialer; the connector fetches it and the recording appears, with `source` and `attributes`
-such as campaign, agent, disposition and call time, which a connector sets when it uploads).
+such as campaign, agent, disposition and call time, which a connector sets when it uploads),
+and the **vocabulary** (`glossary`, `spellings`, with how often each was heard and the last lines
+a spelling was applied to; `importGlossaryCsv` / `importSpellingsCsv` and `glossaryCsv` /
+`spellingsCsv`, or `GET` / `POST /api/v1/vocabulary/glossary.csv` and `spellings.csv` with the
+file as the body).
 
 A recording's life, as the API sees it:
 

@@ -185,39 +185,115 @@ export class FakeTranscription {
   }
 }
 
+export interface FakeTerm {
+  id: string;
+  term: string;
+  language: string;
+  enabled: boolean;
+  note: string;
+  heard: bigint;
+  lastHeardAt?: { seconds: bigint; nanos: number };
+}
+
+export interface FakeSpelling {
+  id: string;
+  source: string;
+  target: string;
+  enabled: boolean;
+  applied: bigint;
+  lastAppliedAt?: { seconds: bigint; nanos: number };
+  examples: {
+    recordingId: string;
+    segmentIndex: number;
+    before: string;
+    after: string;
+    heardAt: { seconds: bigint; nanos: number };
+  }[];
+}
+
+/** likho-language: keeps the glossary and spellings in memory; a test sets the counts it wants. */
 export class FakeLanguage {
-  terms = new Map<string, { id: string; term: string; language: string; enabled: boolean; note: string }>();
-  spellings = new Map<
-    string,
-    { id: string; source: string; target: string; isPhrase: boolean; enabled: boolean }
-  >();
+  terms = new Map<string, FakeTerm>();
+  spellings = new Map<string, FakeSpelling>();
   counter = 0;
+  version = 0;
+
+  private term(id: string, t: { term: string; language: string; enabled: boolean; note: string }) {
+    const existing = this.terms.get(id);
+    const term: FakeTerm = { ...(existing ?? { heard: 0n }), ...t, id };
+    this.terms.set(id, term);
+    return { ...term, isPhrase: term.term.includes(' ') };
+  }
+
+  private spelling(id: string, s: { source: string; target: string; enabled: boolean }) {
+    const existing = this.spellings.get(id);
+    const spelling: FakeSpelling = { ...(existing ?? { applied: 0n, examples: [] }), ...s, id };
+    this.spellings.set(id, spelling);
+    return { ...spelling, isPhrase: spelling.source.includes(' ') };
+  }
 
   routes(router: ConnectRouter) {
     router.service(LanguageService, {
-      listGlossaryTerms: () => ({ terms: [...this.terms.values()] }),
+      listGlossaryTerms: () => ({
+        terms: [...this.terms.values()].map((t) => ({ ...t, isPhrase: t.term.includes(' ') })),
+      }),
       upsertGlossaryTerm: (req) => {
-        const term = { ...req.term!, id: req.term!.id || `glo_${this.counter++}` };
-        this.terms.set(term.id, term);
-        return { term };
+        const t = req.term!;
+        const id =
+          t.id || [...this.terms.values()].find((x) => x.term === t.term)?.id || `glo_${this.counter++}`;
+        return {
+          term: this.term(id, { term: t.term, language: t.language, enabled: t.enabled, note: t.note }),
+        };
       },
       deleteGlossaryTerm: (req) => {
         if (!this.terms.delete(req.id)) throw new ConnectError('not found', Code.NotFound);
         return {};
       },
-      listSpellings: () => ({ spellings: [...this.spellings.values()] }),
+      importGlossaryTerms: (req) => {
+        let added = 0;
+        let updated = 0;
+        for (const t of req.terms) {
+          const existing = [...this.terms.values()].find((x) => x.term === t.term);
+          if (existing) updated++;
+          else added++;
+          this.term(existing?.id ?? `glo_${this.counter++}`, {
+            term: t.term,
+            language: t.language,
+            enabled: t.enabled,
+            note: t.note,
+          });
+        }
+        return { added, updated, vocabularyVersion: BigInt(++this.version) };
+      },
+      listSpellings: () => ({
+        spellings: [...this.spellings.values()].map((s) => ({ ...s, isPhrase: s.source.includes(' ') })),
+      }),
       upsertSpelling: (req) => {
-        const spelling = {
-          ...req.spelling!,
-          id: req.spelling!.id || `spl_${this.counter++}`,
-          isPhrase: req.spelling!.source.includes(' '),
-        };
-        this.spellings.set(spelling.id, spelling);
-        return { spelling };
+        const s = req.spelling!;
+        const id =
+          s.id ||
+          [...this.spellings.values()].find((x) => x.source === s.source)?.id ||
+          `spl_${this.counter++}`;
+        return { spelling: this.spelling(id, { source: s.source, target: s.target, enabled: s.enabled }) };
       },
       deleteSpelling: (req) => {
         if (!this.spellings.delete(req.id)) throw new ConnectError('not found', Code.NotFound);
         return {};
+      },
+      importSpellings: (req) => {
+        let added = 0;
+        let updated = 0;
+        for (const s of req.spellings) {
+          const existing = [...this.spellings.values()].find((x) => x.source === s.source);
+          if (existing) updated++;
+          else added++;
+          this.spelling(existing?.id ?? `spl_${this.counter++}`, {
+            source: s.source,
+            target: s.target,
+            enabled: s.enabled,
+          });
+        }
+        return { added, updated, vocabularyVersion: BigInt(++this.version) };
       },
     });
   }

@@ -24,8 +24,8 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
       '@likho-ai/contracts':
-        specifier: https://github.com/likho-ai/likho-contracts/releases/download/v0.7.0/likho-ai-contracts-0.7.0.tgz
-        version: https://github.com/likho-ai/likho-contracts/releases/download/v0.7.0/likho-ai-contracts-0.7.0.tgz(@bufbuild/protobuf@2.16.0)
+        specifier: https://github.com/likho-ai/likho-contracts/releases/download/v0.9.0/likho-ai-contracts-0.9.0.tgz
+        version: https://github.com/likho-ai/likho-contracts/releases/download/v0.9.0/likho-ai-contracts-0.9.0.tgz(@bufbuild/protobuf@2.16.0)
       '@nestjs/apollo':
         specifier: ^14.0.3
         version: 14.0.3(@apollo/server@5.5.1(graphql@16.14.2))(@as-integrations/express5@1.1.2(@apollo/server@5.5.1(graphql@16.14.2))(express@5.2.1))(@nestjs/common@12.1.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(@nestjs/graphql@14.0.3(@nestjs/common@12.1.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(class-transformer@0.5.1)(class-validator@0.15.1)(graphql@16.14.2)(reflect-metadata@0.2.2)(typescript@6.0.3))(graphql@16.14.2)
@@ -939,9 +939,9 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@likho-ai/contracts@https://github.com/likho-ai/likho-contracts/releases/download/v0.7.0/likho-ai-contracts-0.7.0.tgz':
-    resolution: {integrity: sha512-Gm4T4GCdTFZ6n5lxoNsRdqEUYAI44dW35VMCI7MgGYLThaLTItNt9fUQ3yzNNMlv5f3DU6oFlHZCvOa9pQMSrw==, tarball: https://github.com/likho-ai/likho-contracts/releases/download/v0.7.0/likho-ai-contracts-0.7.0.tgz}
-    version: 0.7.0
+  '@likho-ai/contracts@https://github.com/likho-ai/likho-contracts/releases/download/v0.9.0/likho-ai-contracts-0.9.0.tgz':
+    resolution: {integrity: sha512-LBBYnesP9Eh8UVmu+YIizG+O5g/4+vRfsnrg1kyGKbqRCzZOoYRK3BY8hpL0OTCYybsrX7+quPi3JO+xA3tFfg==, tarball: https://github.com/likho-ai/likho-contracts/releases/download/v0.9.0/likho-ai-contracts-0.9.0.tgz}
+    version: 0.9.0
     peerDependencies:
       '@bufbuild/protobuf': ^2.2.0
 
@@ -3884,7 +3884,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@likho-ai/contracts@https://github.com/likho-ai/likho-contracts/releases/download/v0.7.0/likho-ai-contracts-0.7.0.tgz(@bufbuild/protobuf@2.16.0)':
+  '@likho-ai/contracts@https://github.com/likho-ai/likho-contracts/releases/download/v0.9.0/likho-ai-contracts-0.9.0.tgz(@bufbuild/protobuf@2.16.0)':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
 

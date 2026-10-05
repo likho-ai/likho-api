@@ -1,18 +1,28 @@
-/** The workspace's glossary (names the model listens for) and spelling table, kept by likho-language. */
-import { Args, Field, InputType, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
-import { AuditService } from '../audit/audit.service.js';
+/** The workspace's glossary and spelling table (kept by likho-language), with how often each was heard. */
+import { Args, Field, InputType, Int, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
-import { Clients, fromRpc } from '../clients/clients.module.js';
-import { invalid } from '../common/errors.js';
+import { VocabularyService } from './vocabulary.service.js';
 
 @ObjectType()
 export class GlossaryTerm {
   @Field() id: string;
-  @Field() term: string;
+  @Field({ description: 'A name, or a whole phrase, in the script of the audio.' }) term: string;
   @Field() language: string;
   @Field() enabled: boolean;
   @Field() note: string;
+  @Field({ description: 'Several words: matched as a whole, and a multi-word hotword.' }) isPhrase: boolean;
+  @Field(() => Int, { description: 'How many transcript lines contained the term.' }) heard: number;
+  @Field(() => Date, { nullable: true }) lastHeardAt: Date | null;
+}
+
+@ObjectType()
+export class SpellingExample {
+  @Field() recordingId: string;
+  @Field(() => Int) segmentIndex: number;
+  @Field({ description: 'The line as the model wrote it.' }) before: string;
+  @Field({ description: 'The line as it was written in Hinglish.' }) after: string;
+  @Field(() => Date, { nullable: true }) heardAt: Date | null;
 }
 
 @ObjectType()
@@ -22,6 +32,17 @@ export class Spelling {
   @Field({ description: 'How it must appear in Hinglish.' }) target: string;
   @Field() isPhrase: boolean;
   @Field() enabled: boolean;
+  @Field(() => Int, { description: 'How many transcript lines the spelling was applied to.' })
+  applied: number;
+  @Field(() => Date, { nullable: true }) lastAppliedAt: Date | null;
+  @Field(() => [SpellingExample], { description: 'The last few lines it was applied to, newest first.' })
+  examples: SpellingExample[];
+}
+
+@ObjectType()
+export class ImportResult {
+  @Field(() => Int) added: number;
+  @Field(() => Int) updated: number;
 }
 
 @InputType()
@@ -43,121 +64,76 @@ export class SpellingInput {
 
 @Resolver()
 export class VocabularyResolver {
-  constructor(
-    private readonly clients: Clients,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly vocabulary: VocabularyService) {}
 
   @Query(() => [GlossaryTerm])
-  async glossary(@CurrentUser() me: Principal): Promise<GlossaryTerm[]> {
-    try {
-      const reply = await this.clients.language.listGlossaryTerms({ workspaceId: me.workspaceId });
-      return reply.terms;
-    } catch (error) {
-      throw fromRpc(error, 'language');
-    }
+  glossary(@CurrentUser() me: Principal): Promise<GlossaryTerm[]> {
+    return this.vocabulary.glossary(me);
+  }
+
+  @Query(() => String, {
+    description: 'The glossary as CSV: term, language, enabled, note, heard, last_heard_at.',
+  })
+  glossaryCsv(@CurrentUser() me: Principal): Promise<string> {
+    return this.vocabulary.glossaryCsv(me);
   }
 
   @MinRole('member')
   @Mutation(() => GlossaryTerm)
-  async upsertGlossaryTerm(
+  upsertGlossaryTerm(
     @CurrentUser() me: Principal,
     @Args('input') input: GlossaryTermInput,
   ): Promise<GlossaryTerm> {
-    if (!input.term.trim()) throw invalid('A term is required.');
-    let term: GlossaryTerm;
-    try {
-      const reply = await this.clients.language.upsertGlossaryTerm({
-        workspaceId: me.workspaceId,
-        term: {
-          id: input.id ?? '',
-          term: input.term.trim(),
-          language: input.language ?? 'hi',
-          enabled: input.enabled ?? true,
-          note: input.note ?? '',
-        },
-      });
-      term = reply.term!;
-    } catch (error) {
-      throw fromRpc(error, 'language');
-    }
-    await this.audit.record(
-      me,
-      input.id ? 'glossary.updated' : 'glossary.added',
-      { kind: 'glossary_term', id: term.id },
-      {
-        term: term.term,
-        enabled: term.enabled,
-      },
-    );
-    return term;
+    return this.vocabulary.upsertGlossaryTerm(me, input);
   }
 
   @MinRole('member')
   @Mutation(() => Boolean)
   async deleteGlossaryTerm(@CurrentUser() me: Principal, @Args('id') id: string): Promise<boolean> {
-    try {
-      await this.clients.language.deleteGlossaryTerm({ workspaceId: me.workspaceId, id });
-    } catch (error) {
-      throw fromRpc(error, 'language');
-    }
-    await this.audit.record(me, 'glossary.deleted', { kind: 'glossary_term', id });
+    await this.vocabulary.deleteGlossaryTerm(me, id);
     return true;
   }
 
+  @MinRole('member')
+  @Mutation(() => ImportResult, {
+    description:
+      'Many terms from CSV. The first line names the columns: term (required), language, enabled, note. A term already there is updated.',
+  })
+  importGlossaryCsv(@CurrentUser() me: Principal, @Args('csv') csv: string): Promise<ImportResult> {
+    return this.vocabulary.importGlossaryCsv(me, csv);
+  }
+
   @Query(() => [Spelling])
-  async spellings(@CurrentUser() me: Principal): Promise<Spelling[]> {
-    try {
-      const reply = await this.clients.language.listSpellings({ workspaceId: me.workspaceId });
-      return reply.spellings;
-    } catch (error) {
-      throw fromRpc(error, 'language');
-    }
+  spellings(@CurrentUser() me: Principal): Promise<Spelling[]> {
+    return this.vocabulary.spellings(me);
+  }
+
+  @Query(() => String, {
+    description: 'The spellings as CSV: source, target, enabled, applied, last_applied_at.',
+  })
+  spellingsCsv(@CurrentUser() me: Principal): Promise<string> {
+    return this.vocabulary.spellingsCsv(me);
   }
 
   @MinRole('member')
   @Mutation(() => Spelling)
-  async upsertSpelling(@CurrentUser() me: Principal, @Args('input') input: SpellingInput): Promise<Spelling> {
-    if (!input.source.trim() || !input.target.trim())
-      throw invalid('Both the source and the target are required.');
-    let spelling: Spelling;
-    try {
-      const reply = await this.clients.language.upsertSpelling({
-        workspaceId: me.workspaceId,
-        spelling: {
-          id: input.id ?? '',
-          source: input.source.trim(),
-          target: input.target.trim(),
-          isPhrase: false,
-          enabled: input.enabled ?? true,
-        },
-      });
-      spelling = reply.spelling!;
-    } catch (error) {
-      throw fromRpc(error, 'language');
-    }
-    await this.audit.record(
-      me,
-      input.id ? 'spelling.updated' : 'spelling.added',
-      { kind: 'spelling', id: spelling.id },
-      {
-        source: spelling.source,
-        target: spelling.target,
-        enabled: spelling.enabled,
-      },
-    );
-    return spelling;
+  upsertSpelling(@CurrentUser() me: Principal, @Args('input') input: SpellingInput): Promise<Spelling> {
+    return this.vocabulary.upsertSpelling(me, input);
   }
 
   @MinRole('member')
   @Mutation(() => Boolean)
   async deleteSpelling(@CurrentUser() me: Principal, @Args('id') id: string): Promise<boolean> {
-    try {
-      await this.clients.language.deleteSpelling({ workspaceId: me.workspaceId, id });
-    } catch (error) {
-      throw fromRpc(error, 'language');
-    }
-    await this.audit.record(me, 'spelling.deleted', { kind: 'spelling', id });
+    await this.vocabulary.deleteSpelling(me, id);
     return true;
+  }
+
+  @MinRole('member')
+  @Mutation(() => ImportResult, {
+    description:
+      'Many spellings from CSV. The first line names the columns: source and target (required), enabled. A source already there is updated.',
+  })
+  importSpellingsCsv(@CurrentUser() me: Principal, @Args('csv') csv: string): Promise<ImportResult> {
+    return this.vocabulary.importSpellingsCsv(me, csv);
   }
 }
