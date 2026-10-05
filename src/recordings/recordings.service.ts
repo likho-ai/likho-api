@@ -388,10 +388,10 @@ export class RecordingsService {
         and(eq(jobs.status, 'queued'), lt(jobs.lastProgressAt, new Date(now.getTime() - queuedMax * 60_000))),
       );
     for (const job of stuck) {
-      if (job.attempt < tries) {
+      if (job.asked < 2) {
         const [again] = await this.db
           .update(jobs)
-          .set({ attempt: job.attempt + 1, lastProgressAt: now })
+          .set({ asked: job.asked + 1, lastProgressAt: now })
           .where(and(eq(jobs.id, job.id), eq(jobs.status, 'queued')))
           .returning();
         if (!again) continue;
@@ -559,7 +559,22 @@ export class RecordingsService {
       })
       .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued')))
       .returning();
-    if (!job) return;
+    if (!job) {
+      // A worker took a request that was given up on in the meantime (a stalled job's request,
+      // delivered once more to the worker that came back; a job cancelled while it waited): stop it.
+      const [known] = await this.db.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, jobId));
+      if (known && (known.status === 'failed' || known.status === 'cancelled')) {
+        try {
+          await this.clients.transcription.cancelJob({ jobId });
+          this.log.warn(
+            `job ${jobId} was started after it was ${known.status}: the worker was asked to drop it`,
+          );
+        } catch (error) {
+          this.log.warn(`could not ask the worker to drop job ${jobId}: ${String(error)}`);
+        }
+      }
+      return;
+    }
     await this.setRecordingStatus(job.recordingId, 'transcribing');
     await this.live.publish({
       kind: 'job',
@@ -599,8 +614,12 @@ export class RecordingsService {
         transcriptId: result.transcriptId,
         progressSeconds: result.audioSeconds,
         totalSeconds: result.audioSeconds,
+        errorCode: '',
+        errorMessage: '',
       })
-      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running', 'cancelled'])))
+      // A transcript is never thrown away: a job given up on (cancelled, stalled) whose worker
+      // finished it anyway is done after all.
+      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running', 'cancelled', 'failed'])))
       .returning();
     if (!job) return;
     this.metrics.jobsFinished.add(1, { status: 'done' });

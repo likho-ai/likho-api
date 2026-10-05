@@ -1,6 +1,6 @@
 {
   "name": "likho-api",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Likho API: login, workspaces, recordings, jobs and live lines; GraphQL for the web apps, REST for scripts and connectors",
   "private": true,
   "type": "module",

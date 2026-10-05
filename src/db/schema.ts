@@ -224,8 +224,10 @@ export const jobs = pgTable(
     errorCode: text('error_code').notNull().default(''),
     errorMessage: text('error_message').notNull().default(''),
     transcriptId: text('transcript_id').notNull().default(''),
-    /** 1 for the first try; the sweeper tries a stuck or stalled job once more. */
+    /** 1 for the first try; the sweeper tries a stalled job once more, as a fresh job. */
     attempt: integer().notNull().default(1),
+    /** How many times the workers were asked for this job; a job still queued is asked for once more. */
+    asked: integer().notNull().default(1),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: now(),
     startedAt: timestamp('started_at', { withTimezone: true }),

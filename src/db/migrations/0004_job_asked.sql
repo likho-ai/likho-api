@@ -1,0 +1,1 @@
+ALTER TABLE "jobs" ADD COLUMN "asked" integer DEFAULT 1 NOT NULL;

@@ -608,9 +608,9 @@ describe.skipIf(!stackUp)('likho-api', () => {
       const asked = h
         .published('likho.transcription.requested')
         .filter((e) => e.data.job_id === createJob.id);
-      expect(asked.map((e) => e.data.attempt)).toEqual([1, 2]);
+      expect(asked.map((e) => e.data.attempt)).toEqual([1, 1]); // asked twice; not tried once
       const { job } = await admin.ok(JOB, { id: createJob.id });
-      expect(job).toMatchObject({ status: 'queued', attempt: 2 });
+      expect(job).toMatchObject({ status: 'queued', attempt: 1 });
 
       // Still nobody: the second try was the last.
       await age(createJob.id);
@@ -666,6 +666,13 @@ describe.skipIf(!stackUp)('likho-api', () => {
       const { recording: mid } = await admin.ok(GET_RECORDING, { id: recording.id });
       expect(mid.status).toBe('queued');
 
+      // The fresh try is a job of its own: it too is asked for again before it is given up on.
+      await age(list[0].id);
+      expect(await sweep()).toEqual({ requeued: 1, failed: 0 });
+      expect(
+        h.published('likho.transcription.requested').filter((e) => e.data.job_id === list[0].id),
+      ).toHaveLength(2);
+
       // The second try stalls as well: that was the last one.
       await age(list[0].id, 'running');
       expect(await sweep()).toEqual({ requeued: 0, failed: 1 });
@@ -674,13 +681,62 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(after.jobs.map((j: any) => j.status)).toEqual(['failed', 'failed']);
     });
 
+    it('a worker that starts a job given up on is told to drop it; a transcript that comes anyway counts', async () => {
+      const recording = await readyRecording(admin, 'late.mp3', 'ready');
+      const { createJob } = await admin.ok(
+        `mutation ($id: String!) { createJob(input: { recordingId: $id }) { id } }`,
+        { id: recording.id },
+      );
+      const workspaceId = h.media.uploads.at(-1)!.workspaceId;
+      const stops = () => h.transcription.cancelled.filter((id) => id === createJob.id).length;
+      await age(createJob.id, 'running');
+      expect(await sweep()).toEqual({ requeued: 1, failed: 1 });
+      expect(stops()).toBe(1);
+
+      // The request of the stalled job reaches the worker that comes back: it is told to drop it.
+      await h.publish('likho.transcription.started', 'likho.transcription.started.v1', {
+        job_id: createJob.id,
+        recording_id: recording.id,
+        workspace_id: workspaceId,
+        attempt: 2,
+      });
+      await until(async () => (stops() === 2 ? true : null), 'the worker to be asked to drop the job');
+      const { job: still } = await admin.ok(JOB, { id: createJob.id });
+      expect(still).toMatchObject({ status: 'failed', errorCode: 'stalled' });
+
+      // A worker that finished it all the same: the transcript is kept, the job is done after all.
+      const transcript = h.transcription.add('trn_01JB7Z5K3M9Q2W4X6Y8A0LATE', recording.id, createJob.id);
+      await h.publish('likho.transcription.completed', 'likho.transcription.completed.v1', {
+        job_id: createJob.id,
+        recording_id: recording.id,
+        transcript_id: transcript.id,
+        workspace_id: workspaceId,
+        version: 1,
+        language: { detected: 'hi', probability: 0.9, candidates: [], decoded_as: 'hi', policy: 'auto' },
+        stats: {
+          audio_seconds: 61.5,
+          elapsed_seconds: 40,
+          segments: 2,
+          chunks: 6,
+          silence_skipped_seconds: 3,
+        },
+      });
+      const done = await until(async () => {
+        const { job } = await admin.ok(JOB, { id: createJob.id });
+        return job.status === 'done' ? job : null;
+      }, 'the job to be done after all');
+      expect(done).toMatchObject({ status: 'done', errorCode: '', errorMessage: '' });
+      const { recording: after } = await admin.ok(GET_RECORDING, { id: recording.id });
+      expect(after).toMatchObject({ status: 'done', latestTranscriptId: transcript.id });
+    });
+
     it('/metrics says how many jobs are in each state', async () => {
       const response = await fetch(`${h.url}/metrics`);
       expect(response.status).toBe(200);
       const text = await response.text();
       expect(text).toMatch(/likho_jobs\{[^}]*status="failed"[^}]*\} [1-9]/);
       expect(text).toMatch(/likho_jobs_finished_total\{[^}]*status="failed"[^}]*\} [1-9]/);
-      expect(text).toMatch(/likho_job_sweeps_total\{[^}]*outcome="requeued"[^}]*\} 2/);
+      expect(text).toMatch(/likho_job_sweeps_total\{[^}]*outcome="requeued"[^}]*\} 4/);
       expect(text).toContain('likho_jobs_queue_oldest_seconds');
       expect(text).toMatch(/likho_events_handled_total\{[^}]*outcome="ok"/);
     });
