@@ -204,6 +204,7 @@ ConfigMaps and Secrets.
 | `JOB_STALL_MAX_MINUTES` | `10` | A running job with no line for this long is stopped, failed (`stalled`) and tried once more |
 | `JOB_MAX_ATTEMPTS` | `2` | Tries a job gets in all |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Also push the metrics there (OTLP/HTTP, e.g. `http://localhost:4318`); `/metrics` is always on |
+| `TZ` | the machine's | A connector's `callTime` attribute that carries no zone (a dialer's `2026-10-02 10:55:02`) is read in this zone; set the company's zone in `.env.<env>.local` or the deployment |
 
 ## Develop
 
