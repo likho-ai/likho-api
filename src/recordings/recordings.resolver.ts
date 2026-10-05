@@ -4,10 +4,12 @@ import { Clients, fromRpc } from '../clients/clients.module.js';
 import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Transcript, transcriptFromPb } from '../transcripts/transcripts.graphql.js';
+import { invalid } from '../common/errors.js';
 import {
   Attribute,
   attributeList,
   CreateJobInput,
+  FacetValue,
   Job,
   JobStatusEnum,
   Recording,
@@ -17,7 +19,7 @@ import {
   RequestUploadInput,
   UploadTicket,
 } from './recordings.graphql.js';
-import { type RecordingRow, RecordingsService } from './recordings.service.js';
+import { FACET_KEYS, type FacetKey, type RecordingRow, RecordingsService } from './recordings.service.js';
 
 @Resolver(() => Recording)
 export class RecordingsResolver {
@@ -37,10 +39,37 @@ export class RecordingsResolver {
     const page = await this.service.list(me.workspaceId, {
       status: filter?.status,
       search: filter?.search,
+      campaign: filter?.campaign,
+      agent: filter?.agent,
+      disposition: filter?.disposition,
+      source: filter?.source,
+      since: filter?.since,
+      until: filter?.until,
       after: after ?? undefined,
       limit: first ?? undefined,
     });
     return { items: page.items, hasMore: page.hasMore, endCursor: page.items.at(-1)?.id ?? null };
+  }
+
+  @Query(() => [FacetValue], {
+    description:
+      'The values one fact takes across the recordings (campaign, agent, disposition or source), most common first; narrowed by the same filter as recordings.',
+  })
+  async recordingFacets(
+    @CurrentUser() me: Principal,
+    @Args('key') key: string,
+    @Args('filter', { nullable: true }) filter?: RecordingFilter,
+  ): Promise<FacetValue[]> {
+    if (!(FACET_KEYS as readonly string[]).includes(key))
+      throw invalid(`The key is one of ${FACET_KEYS.join(', ')}.`);
+    return this.service.facets(me.workspaceId, key as FacetKey, {
+      campaign: filter?.campaign,
+      agent: filter?.agent,
+      disposition: filter?.disposition,
+      source: filter?.source,
+      since: filter?.since,
+      until: filter?.until,
+    });
   }
 
   @Query(() => Recording)

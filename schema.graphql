@@ -110,6 +110,12 @@ type Engine {
   registryId: String!
 }
 
+"""One value of a fact about the calls, and how many recordings have it."""
+type FacetValue {
+  count: Int!
+  value: String!
+}
+
 type GlossaryTerm {
   enabled: Boolean!
 
@@ -286,6 +292,9 @@ type Mutation {
 
   """Removes the recording, its audio and its jobs."""
   deleteRecording(id: String!): Boolean!
+
+  """Removes a saved search: who saved it, or an admin."""
+  deleteSavedSearch(id: String!): Boolean!
   deleteSpelling(id: String!): Boolean!
 
   """The person cannot sign in any more; their sessions end now."""
@@ -341,6 +350,9 @@ type Mutation {
 
   """Makes an invitation link useless."""
   revokeInvitation(id: String!): Boolean!
+
+  """Keeps a search (the words and the filter) for later."""
+  saveSearch(input: SaveSearchInput!): SavedSearch!
 
   """
   Changes what a person may do. You cannot take your own admin role away.
@@ -407,11 +419,19 @@ type Query {
   """How many recordings are in each state."""
   recordingCounts: RecordingCounts!
 
+  """
+  The values one fact takes across the recordings (campaign, agent, disposition or source), most common first; narrowed by the same filter as recordings.
+  """
+  recordingFacets(filter: RecordingFilter, key: String!): [FacetValue!]!
+
   """The workspace’s recordings, newest first."""
   recordings(after: String, filter: RecordingFilter, first: Int): RecordingPage!
 
+  """The searches kept for later, newest first; shared by the workspace."""
+  savedSearches: [SavedSearch!]!
+
   """
-  Transcript lines matching a few words, in either layer, typos allowed; best first.
+  Transcript lines matching a few words, in either layer, typos allowed; best first. Narrowed by language, recording, campaign, agent, disposition, source, or when the call happened.
   """
   search(filter: SearchFilter, page: Int, pageSize: Int, query: String!): SearchPage!
   settings: Settings!
@@ -437,6 +457,11 @@ type Query {
 type Recording {
   """Facts about the call from where it came."""
   attributes: [Attribute!]!
+
+  """
+  When the call happened: the dialer’s call time when known, else when the recording was made.
+  """
+  callTime: DateTime!
   channels: Int!
   createdAt: DateTime!
   detectedLanguage: String!
@@ -479,9 +504,27 @@ type RecordingCounts {
 }
 
 input RecordingFilter {
+  """The agent attribute, exactly."""
+  agent: String
+
+  """The campaign attribute, exactly."""
+  campaign: String
+
+  """The disposition attribute, exactly."""
+  disposition: String
+
   """Part of the file name or the external id."""
   search: String
+
+  """Calls from this moment (their call time)."""
+  since: DateTime
+
+  """Where the call came from: upload, api, or a connector’s name."""
+  source: String
   status: [RecordingStatus!]
+
+  """Calls up to this moment (their call time)."""
+  until: DateTime
 }
 
 type RecordingPage {
@@ -538,7 +581,58 @@ enum Role {
   viewer
 }
 
+input SaveSearchInput {
+  filter: SearchFilter
+
+  """A short name, e.g. "refunds, sales, last week"."""
+  name: String!
+
+  """The words to search for."""
+  query: String!
+}
+
+"""A search kept for later, shared by the workspace."""
+type SavedSearch {
+  createdAt: DateTime!
+
+  """Who saved it."""
+  createdBy: String
+  filter: SavedSearchFilter!
+  id: String!
+  name: String!
+  query: String!
+}
+
+"""The filter of a saved search, as it was saved."""
+type SavedSearchFilter {
+  agent: String
+  callSince: DateTime
+  callUntil: DateTime
+  campaign: String
+  disposition: String
+  language: String
+  recordingId: String
+  since: DateTime
+  source: String
+  until: DateTime
+}
+
 input SearchFilter {
+  """The agent attribute, exactly."""
+  agent: String
+
+  """Calls from this moment (their call time)."""
+  callSince: DateTime
+
+  """Calls up to this moment (their call time)."""
+  callUntil: DateTime
+
+  """The campaign attribute, exactly."""
+  campaign: String
+
+  """The disposition attribute, exactly."""
+  disposition: String
+
   """A detected language (ISO 639-1)."""
   language: String
 
@@ -547,6 +641,9 @@ input SearchFilter {
 
   """Transcripts created from this moment."""
   since: DateTime
+
+  """Where the call came from: upload, api, or a connector’s name."""
+  source: String
 
   """Transcripts created up to this moment."""
   until: DateTime

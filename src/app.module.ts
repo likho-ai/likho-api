@@ -27,6 +27,7 @@ import {
   RecordingsController,
   SearchController,
 } from './rest/rest.controller.js';
+import { SavedSearchesService } from './search/saved.service.js';
 import { SearchResolver } from './search/search.resolver.js';
 import { SearchService } from './search/search.service.js';
 import { SettingsResolver } from './settings/settings.resolver.js';
@@ -91,6 +92,7 @@ export function appModule(config?: Config) {
       RecordingsService,
       ImportsService,
       SearchService,
+      SavedSearchesService,
       VocabularyService,
       EventsConsumer,
       JobsSweeper,

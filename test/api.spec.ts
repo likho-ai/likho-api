@@ -459,6 +459,143 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(h.search.asked.at(-1)).toMatchObject({ query: 'order', language: 'hi', pageSize: 10 });
       expect(h.search.asked.at(-1)!.workspaceId).toBe(h.media.uploads.at(-1)!.workspaceId);
       expect(await admin.fails(`query { search(query: "   ") { total } }`)).toBe('invalid');
+
+      // "Every sale call of agent-x since last week with the word refund": the facts go along.
+      await admin.ok(
+        `query { search(query: "refund", filter: { campaign: "sale", agent: "agent-x", source: "ameyo", callSince: "2026-09-28T00:00:00.000Z" }) { total } }`,
+      );
+      expect(h.search.asked.at(-1)).toMatchObject({
+        query: 'refund',
+        campaign: 'sale',
+        agent: 'agent-x',
+        source: 'ameyo',
+        callSince: new Date('2026-09-28T00:00:00.000Z'),
+      });
+    });
+
+    it('the facts of a call narrow the library, have counts, and go on the bus', async () => {
+      const facts = (campaign: string, agent: string, callTime: string) => ({
+        attributes: [
+          { key: 'campaign', value: campaign },
+          { key: 'agent', value: agent },
+          { key: 'disposition', value: 'sold' },
+          { key: 'callTime', value: callTime },
+        ],
+      });
+      const first = await readyRecording(
+        admin,
+        'sale-1.mp3',
+        'queued',
+        facts('sale', 'agent-x', '2026-10-01 09:00:00'),
+      );
+      const second = await readyRecording(
+        admin,
+        'sale-2.mp3',
+        'queued',
+        facts('sale', 'agent-y', '2026-09-20 09:00:00'),
+      );
+      const third = await readyRecording(
+        admin,
+        'support-1.mp3',
+        'queued',
+        facts('support', 'agent-x', '2026-10-02 09:00:00'),
+      );
+
+      // The call time comes from the attribute, read in this process's time zone.
+      const { recording } = await admin.ok(
+        `query ($id: String!) { recording(id: $id) { callTime createdAt } }`,
+        {
+          id: first.id,
+        },
+      );
+      expect(new Date(recording.callTime).getTime()).toBe(new Date('2026-10-01T09:00:00').getTime());
+
+      const ids = (page: { items: { id: string }[] }) => page.items.map((r) => r.id).sort();
+      const { recordings: sale } = await admin.ok(
+        `query { recordings(filter: { campaign: "sale" }, first: 50) { items { id } } }`,
+      );
+      expect(ids(sale)).toEqual([first.id, second.id].sort());
+      const { recordings: agentX } = await admin.ok(
+        `query { recordings(filter: { agent: "agent-x", since: "2026-10-01T00:00:00.000Z" }, first: 50) { items { id } } }`,
+      );
+      expect(ids(agentX)).toEqual([first.id, third.id].sort());
+      const { recordings: lastWeek } = await admin.ok(
+        `query { recordings(filter: { campaign: "sale", until: "2026-09-30T00:00:00.000Z" }, first: 50) { items { id } } }`,
+      );
+      expect(ids(lastWeek)).toEqual([second.id]);
+      const { recordings: uploads } = await admin.ok(
+        `query { recordings(filter: { source: "upload", disposition: "sold" }, first: 50) { items { id } } }`,
+      );
+      expect(ids(uploads)).toEqual([first.id, second.id, third.id].sort());
+
+      const { recordingFacets: campaigns } = await admin.ok(
+        `query { recordingFacets(key: "campaign", filter: { disposition: "sold" }) { value count } }`,
+      );
+      expect(campaigns).toEqual([
+        { value: 'sale', count: 2 },
+        { value: 'support', count: 1 },
+      ]);
+      const { recordingFacets: agents } = await admin.ok(
+        `query { recordingFacets(key: "agent", filter: { campaign: "sale" }) { value count } }`,
+      );
+      expect(agents).toEqual([
+        { value: 'agent-x', count: 1 },
+        { value: 'agent-y', count: 1 },
+      ]);
+      expect(await admin.fails(`query { recordingFacets(key: "phone") { value } }`)).toBe('invalid');
+
+      // likho-search was told the facts the moment the recording was made.
+      const told = h.published('likho.recording.updated').find((e) => e.data.recording_id === first.id);
+      expect(told).toMatchObject({
+        type: 'likho.recording.updated.v1',
+        data: {
+          recording_id: first.id,
+          source: 'upload',
+          name: 'sale-1.mp3',
+          attributes: { campaign: 'sale', agent: 'agent-x', disposition: 'sold' },
+        },
+      });
+      expect(new Date(told!.data.call_time as string).getTime()).toBe(
+        new Date('2026-10-01T09:00:00').getTime(),
+      );
+    });
+
+    it('a search can be kept for later, and removed by who kept it or an admin', async () => {
+      const { saveSearch } = await admin.ok(
+        `mutation { saveSearch(input: { name: "refunds in sales", query: "refund", filter: { campaign: "sale", agent: "agent-x", callSince: "2026-09-28T00:00:00.000Z" } }) {
+          id name query filter { campaign agent disposition callSince callUntil } createdBy createdAt
+        } }`,
+      );
+      expect(saveSearch).toMatchObject({
+        name: 'refunds in sales',
+        query: 'refund',
+        filter: {
+          campaign: 'sale',
+          agent: 'agent-x',
+          disposition: null,
+          callSince: '2026-09-28T00:00:00.000Z',
+          callUntil: null,
+        },
+      });
+      expect(saveSearch.createdBy).toMatch(/^usr_/);
+      const { savedSearches } = await admin.ok(`{ savedSearches { id name query filter { campaign } } }`);
+      expect(savedSearches).toContainEqual({
+        id: saveSearch.id,
+        name: 'refunds in sales',
+        query: 'refund',
+        filter: { campaign: 'sale' },
+      });
+      expect(await admin.fails(`mutation { saveSearch(input: { name: " ", query: "refund" }) { id } }`)).toBe(
+        'invalid',
+      );
+      expect(
+        await admin.ok(`mutation ($id: String!) { deleteSavedSearch(id: $id) }`, { id: saveSearch.id }),
+      ).toEqual({
+        deleteSavedSearch: true,
+      });
+      expect(
+        await admin.fails(`mutation ($id: String!) { deleteSavedSearch(id: $id) }`, { id: saveSearch.id }),
+      ).toBe('not_found');
     });
   });
 
@@ -1210,6 +1347,8 @@ describe.skipIf(!stackUp)('likho-api', () => {
         'spelling.added',
         'spelling.imported',
         'spelling.deleted',
+        'search.saved',
+        'search.deleted',
       ]) {
         expect(actions, action).toContain(action);
       }

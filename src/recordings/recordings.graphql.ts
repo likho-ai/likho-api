@@ -71,9 +71,20 @@ export class Recording {
   @Field() latestTranscriptId: string;
   @Field() detectedLanguage: string;
   @Field(() => Float) languageProbability: number;
+  @Field({
+    description:
+      'When the call happened: the dialer’s call time when known, else when the recording was made.',
+  })
+  callTime: Date;
   @Field() createdAt: Date;
   @Field() updatedAt: Date;
   // playbackUrl, peaksUrl, jobs and latestTranscript are resolved on demand (see the resolver).
+}
+
+@ObjectType({ description: 'One value of a fact about the calls, and how many recordings have it.' })
+export class FacetValue {
+  @Field() value: string;
+  @Field(() => Int) count: number;
 }
 
 @ObjectType()
@@ -134,4 +145,13 @@ export class CreateJobInput {
 export class RecordingFilter {
   @Field(() => [RecordingStatusEnum], { nullable: true }) status?: (keyof typeof RecordingStatusEnum)[];
   @Field({ nullable: true, description: 'Part of the file name or the external id.' }) search?: string;
+  @Field({ nullable: true, description: 'The campaign attribute, exactly.' }) campaign?: string;
+  @Field({ nullable: true, description: 'The agent attribute, exactly.' }) agent?: string;
+  @Field({ nullable: true, description: 'The disposition attribute, exactly.' }) disposition?: string;
+  @Field({ nullable: true, description: 'Where the call came from: upload, api, or a connector’s name.' })
+  source?: string;
+  @Field(() => Date, { nullable: true, description: 'Calls from this moment (their call time).' })
+  since?: Date;
+  @Field(() => Date, { nullable: true, description: 'Calls up to this moment (their call time).' })
+  until?: Date;
 }

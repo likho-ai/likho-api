@@ -25,8 +25,13 @@ browser ── SSE     /events ───┘               ├── likho-transc
                                                   likho.recording.deleted
 ```
 
-Beyond uploads: **search** (`search(query)` / `GET /api/v1/search?q=` - every transcript line,
-either layer, typos allowed, matches marked, each hit with its recording), **imports**
+Beyond uploads: **search** (`search(query, filter)` / `GET /api/v1/search?q=` - every transcript
+line, either layer, typos allowed, matches marked, each hit with its recording; narrowed by
+language, campaign, agent, disposition, source or when the call happened; `saveSearch` keeps
+the words and the filter for everyone in the workspace), **the library by the facts of a call**
+(`recordings(filter: { campaign, agent, disposition, source, since, until })` on the call time,
+`recordingFacets(key)` for the values a fact takes with their counts; every recording's facts go
+out as `likho.recording.updated` for likho-search), **imports**
 (`requestImport(externalId)` / `POST /api/v1/imports` - a call asked for by its id in the
 dialer; the connector fetches it and the recording appears, with `source` and `attributes`
 such as campaign, agent, disposition and call time, which a connector sets when it uploads),

@@ -1,6 +1,6 @@
 {
-  "id": "b87cd740-2e12-4998-a424-fbdcc7cea6d7",
-  "prevId": "cd2c927f-7dc3-413c-bc8c-3771c4198bcc",
+  "id": "7c348b33-60c4-4393-ba65-4add453ad5b3",
+  "prevId": "58208b26-4cef-4606-b3cf-9d0049a459c9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -660,6 +660,13 @@
           "notNull": true,
           "default": 1
         },
+        "asked": {
+          "name": "asked",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -974,6 +981,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "call_time": {
+          "name": "call_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1022,6 +1036,27 @@
             },
             {
               "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "recordings_workspace_call_time": {
+          "name": "recordings_workspace_call_time",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "call_time",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1082,6 +1117,104 @@
         "recordings_created_by_users_id_fk": {
           "name": "recordings_created_by_users_id_fk",
           "tableFrom": "recordings",
+          "tableTo": "users",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.saved_searches": {
+      "name": "saved_searches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "query": {
+          "name": "query",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "filter": {
+          "name": "filter",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "saved_searches_workspace": {
+          "name": "saved_searches_workspace",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "saved_searches_workspace_id_workspaces_id_fk": {
+          "name": "saved_searches_workspace_id_workspaces_id_fk",
+          "tableFrom": "saved_searches",
+          "tableTo": "workspaces",
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "saved_searches_created_by_users_id_fk": {
+          "name": "saved_searches_created_by_users_id_fk",
+          "tableFrom": "saved_searches",
           "tableTo": "users",
           "columnsFrom": ["created_by"],
           "columnsTo": ["id"],

@@ -6,7 +6,7 @@
  */
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { MediaKind } from '@likho-ai/contracts/media/v1/media_pb';
-import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { Clients, fromRpc } from '../clients/clients.module.js';
 import { newId } from '../common/ids.js';
 import { invalid, notFound } from '../common/errors.js';
@@ -58,6 +58,33 @@ export function cleanAttributes(raw: Record<string, unknown> | undefined): Recor
   }
   return clean;
 }
+
+/**
+ * When the call happened: the callTime attribute a connector sets (the dialer's text, read in
+ * this process's time zone when it carries none), else when the recording was made.
+ */
+export function callTimeOf(attributes: Record<string, string>, createdAt: Date): Date {
+  const text = attributes.callTime?.trim();
+  if (text) {
+    const parsed = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(text) ? text.replace(' ', 'T') : text);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return createdAt;
+}
+
+/** The facts about the calls a list can be narrowed by, besides status and name. */
+export interface FactsFilter {
+  campaign?: string;
+  agent?: string;
+  disposition?: string;
+  source?: string;
+  /** On the call time. */
+  since?: Date;
+  until?: Date;
+}
+
+export const FACET_KEYS = ['campaign', 'agent', 'disposition', 'source'] as const;
+export type FacetKey = (typeof FACET_KEYS)[number];
 
 export interface UploadAnswer {
   recording: RecordingRow;
@@ -154,16 +181,68 @@ export class RecordingsService {
         source: input.source,
         externalId: input.externalId?.trim() ?? '',
         attributes,
+        callTime: callTimeOf(attributes, new Date()),
         status: reply.existingMedia ? 'ready' : 'uploading',
         createdBy: userId,
       })
       .returning();
+    await this.publishUpdated(recording!);
     return {
       recording: recording!,
       uploadUrl: reply.uploadUrl,
       expiresAt: reply.expiresAt ? new Date(Number(reply.expiresAt.seconds) * 1000) : null,
       duplicateOf: null,
     };
+  }
+
+  /** Tells likho-search (and whoever else listens) what is known about a recording. */
+  private async publishUpdated(recording: RecordingRow): Promise<void> {
+    await this.bus.publish(
+      'likho.recording.updated',
+      event('likho.recording.updated.v1', recording.id, {
+        recording_id: recording.id,
+        workspace_id: recording.workspaceId,
+        source: recording.source,
+        external_id: recording.externalId,
+        name: recording.originalName,
+        call_time: recording.callTime.toISOString(),
+        attributes: recording.attributes,
+      }),
+    );
+  }
+
+  /** The conditions a facts filter adds to a query of this workspace's recordings. */
+  private factConditions(filter: FactsFilter) {
+    const conditions = [];
+    for (const key of ['campaign', 'agent', 'disposition'] as const) {
+      const value = filter[key]?.trim();
+      if (value) conditions.push(sql`${recordings.attributes}->>${key} = ${value}`);
+    }
+    if (filter.source?.trim()) conditions.push(eq(recordings.source, filter.source.trim()));
+    if (filter.since) conditions.push(gte(recordings.callTime, filter.since));
+    if (filter.until) conditions.push(lte(recordings.callTime, filter.until));
+    return conditions;
+  }
+
+  /** The values one fact takes across the workspace's recordings, most common first. */
+  async facets(
+    workspaceId: string,
+    key: FacetKey,
+    filter: FactsFilter = {},
+  ): Promise<{ value: string; count: number }[]> {
+    if (!FACET_KEYS.includes(key)) throw invalid(`The facet is one of ${FACET_KEYS.join(', ')}.`);
+    const value =
+      key === 'source' ? recordings.source : sql<string>`${recordings.attributes}->>${sql.raw(`'${key}'`)}`;
+    const rows = await this.db
+      .select({ value, count: sql<number>`count(*)::int` })
+      .from(recordings)
+      .where(
+        and(eq(recordings.workspaceId, workspaceId), sql`${value} <> ''`, ...this.factConditions(filter)),
+      )
+      .groupBy(value)
+      .orderBy(sql`count(*) desc`, value)
+      .limit(100);
+    return rows.filter((row) => row.value != null && row.value !== '');
   }
 
   // ---------------------------------------------------------------- reading
@@ -185,10 +264,15 @@ export class RecordingsService {
   /** Newest first. `after` is the id of the last recording of the previous page. */
   async list(
     workspaceId: string,
-    filter: { status?: RecordingStatus[]; search?: string; after?: string; limit?: number } = {},
+    filter: FactsFilter & {
+      status?: RecordingStatus[];
+      search?: string;
+      after?: string;
+      limit?: number;
+    } = {},
   ): Promise<{ items: RecordingRow[]; hasMore: boolean }> {
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), PAGE_LIMIT);
-    const conditions = [eq(recordings.workspaceId, workspaceId)];
+    const conditions = [eq(recordings.workspaceId, workspaceId), ...this.factConditions(filter)];
     if (filter.status?.length) {
       for (const status of filter.status) {
         if (!RECORDING_STATUSES.includes(status)) throw invalid(`Unknown status ${status}.`);

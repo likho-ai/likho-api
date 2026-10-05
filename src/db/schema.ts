@@ -192,15 +192,39 @@ export const recordings = pgTable(
     detectedLanguage: text('detected_language').notNull().default(''),
     languageProbability: doublePrecision('language_probability').notNull().default(0),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    /** When the call happened: the dialer's call time (attribute callTime) when known, else when the recording was made. */
+    callTime: timestamp('call_time', { withTimezone: true }).notNull().defaultNow(),
     createdAt: now(),
     updatedAt: now(),
   },
   (table) => [
     index('recordings_workspace_created').on(table.workspaceId, table.createdAt),
     index('recordings_workspace_status').on(table.workspaceId, table.status),
+    index('recordings_workspace_call_time').on(table.workspaceId, table.callTime),
     uniqueIndex('recordings_media').on(table.mediaId),
     index('recordings_external').on(table.workspaceId, table.externalId),
   ],
+);
+
+/** A search a person wants back: the words and the filter, shared by the workspace. */
+export const savedSearches = pgTable(
+  'saved_searches',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    query: text().notNull(),
+    /** The SearchFilter as given: language, recordingId, campaign, agent, disposition, source, callSince, callUntil (ISO). */
+    filter: jsonb()
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: now(),
+  },
+  (table) => [index('saved_searches_workspace').on(table.workspaceId, table.createdAt)],
 );
 
 export const JOB_STATUSES = ['queued', 'running', 'done', 'failed', 'cancelled'] as const;

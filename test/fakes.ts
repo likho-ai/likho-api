@@ -5,7 +5,7 @@
 import { Code, ConnectError, ConnectRouter } from '@connectrpc/connect';
 import { connectNodeAdapter } from '@connectrpc/connect-node';
 import { create } from '@bufbuild/protobuf';
-import { timestampFromDate } from '@bufbuild/protobuf/wkt';
+import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { Script } from '@likho-ai/contracts/common/v1/common_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
@@ -309,6 +309,12 @@ export class FakeSearch {
     recordingId: string;
     page: number;
     pageSize: number;
+    campaign: string;
+    agent: string;
+    disposition: string;
+    source: string;
+    callSince?: Date;
+    callUntil?: Date;
   }[] = [];
   reindexed: string[] = [];
   deleted: string[] = [];
@@ -323,6 +329,12 @@ export class FakeSearch {
           recordingId: req.recordingId,
           page: req.page,
           pageSize: req.pageSize,
+          campaign: req.campaign,
+          agent: req.agent,
+          disposition: req.disposition,
+          source: req.source,
+          callSince: req.callSince ? timestampDate(req.callSince) : undefined,
+          callUntil: req.callUntil ? timestampDate(req.callUntil) : undefined,
         });
         return {
           hits: this.hits.map((hit) => create(HitSchema, hit)),

@@ -14,6 +14,13 @@ export interface SearchQuery {
   recordingId?: string;
   since?: Date;
   until?: Date;
+  /** The recording's facts, exactly; a window on the call time. */
+  campaign?: string;
+  agent?: string;
+  disposition?: string;
+  source?: string;
+  callSince?: Date;
+  callUntil?: Date;
   page?: number;
   pageSize?: number;
 }
@@ -59,6 +66,12 @@ export class SearchService {
         recordingId: input.recordingId ?? '',
         since: input.since ? timestampFromDate(input.since) : undefined,
         until: input.until ? timestampFromDate(input.until) : undefined,
+        campaign: input.campaign?.trim() ?? '',
+        agent: input.agent?.trim() ?? '',
+        disposition: input.disposition?.trim() ?? '',
+        source: input.source?.trim() ?? '',
+        callSince: input.callSince ? timestampFromDate(input.callSince) : undefined,
+        callUntil: input.callUntil ? timestampFromDate(input.callUntil) : undefined,
         page: input.page ?? 0,
         pageSize: input.pageSize ?? 0,
       });
