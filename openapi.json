@@ -728,9 +728,121 @@
         ]
       }
     },
+    "/api/v1/recordings/{id}/insights": {
+      "get": {
+        "description": "The summary, the products, the customer’s mood and the auditor’s form pre-filled, for the recording’s latest analysed transcript. 404 while it has none.",
+        "operationId": "InsightsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The insights of a recording",
+        "tags": [
+          "insights"
+        ]
+      },
+      "post": {
+        "description": "Asks the model about the recording’s latest transcript and answers with the insights.",
+        "operationId": "InsightsController_analyse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Analyse a recording now",
+        "tags": [
+          "insights"
+        ]
+      }
+    },
+    "/api/v1/insights/status": {
+      "get": {
+        "description": "enabled is false when no model is configured: nothing is analysed and no transcript text leaves.",
+        "operationId": "InsightsController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether insights are made at all",
+        "tags": [
+          "insights"
+        ]
+      }
+    },
     "/events/jobs/{id}": {
       "get": {
         "operationId": "LiveController_job",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Live"
+        ]
+      }
+    },
+    "/events/recordings/{id}": {
+      "get": {
+        "operationId": "LiveController_recording",
         "parameters": [
           {
             "name": "id",
@@ -914,6 +1026,15 @@
         "required": [
           "externalId"
         ]
+      },
+      "AnalyseDto": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "description": "Analyse again even when the recording has insights."
+          }
+        }
       }
     }
   }

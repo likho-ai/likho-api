@@ -5,6 +5,7 @@
 import { Global, Inject, Injectable, Module } from '@nestjs/common';
 import { Client, Code, ConnectError, createClient } from '@connectrpc/connect';
 import { createGrpcTransport } from '@connectrpc/connect-node';
+import { InsightsService } from '@likho-ai/contracts/insights/v1/insights_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaService } from '@likho-ai/contracts/media/v1/media_pb';
 import { SearchService } from '@likho-ai/contracts/search/v1/search_pb';
@@ -16,6 +17,7 @@ export type MediaClient = Client<typeof MediaService>;
 export type TranscriptionClient = Client<typeof TranscriptionService>;
 export type LanguageClient = Client<typeof LanguageService>;
 export type SearchClient = Client<typeof SearchService>;
+export type InsightsClient = Client<typeof InsightsService>;
 
 @Injectable()
 export class Clients {
@@ -23,6 +25,7 @@ export class Clients {
   readonly transcription: TranscriptionClient;
   readonly language: LanguageClient;
   readonly search: SearchClient;
+  readonly insights: InsightsClient;
 
   constructor(@Inject(CONFIG) config: Config) {
     const transport = (address: string) =>
@@ -34,6 +37,7 @@ export class Clients {
     this.transcription = createClient(TranscriptionService, transport(config.TRANSCRIPTION_GRPC_ADDR));
     this.language = createClient(LanguageService, transport(config.LANGUAGE_GRPC_ADDR));
     this.search = createClient(SearchService, transport(config.SEARCH_GRPC_ADDR));
+    this.insights = createClient(InsightsService, transport(config.INSIGHTS_GRPC_ADDR));
   }
 }
 

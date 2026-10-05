@@ -137,7 +137,7 @@ export class BusService implements OnModuleInit, OnModuleDestroy {
     stream: 'LIKHO' | 'LIKHO_LIVE';
     durable: string;
     subject: string;
-    /** 'all': also events published while nobody listened. 'new': only from now on. */
+    /** 'all': also events published while nobody listened. 'new': only from now on. Default: CONSUMER_START. */
     from?: 'all' | 'new';
     handler: Handler;
   }): Promise<void> {
@@ -148,7 +148,8 @@ export class BusService implements OnModuleInit, OnModuleDestroy {
       ack_policy: AckPolicy.Explicit,
       ack_wait: 30_000_000_000, // 30 s, in nanoseconds
       max_deliver: 5,
-      deliver_policy: options.from === 'new' ? DeliverPolicy.New : DeliverPolicy.All,
+      deliver_policy:
+        (options.from ?? this.config.CONSUMER_START) === 'new' ? DeliverPolicy.New : DeliverPolicy.All,
       filter_subject: options.subject,
     });
     const consumer = await this.jetstream.consumers.get(options.stream, durable);

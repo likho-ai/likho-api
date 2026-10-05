@@ -1,6 +1,6 @@
 /**
  * The service under test: the real application on a free port, against PostgreSQL (its own
- * schema), NATS and Redis from the likho-infra stack, with the three other services faked.
+ * schema), NATS and Redis from the likho-infra stack, with the other services faked.
  *
  * Start the stack first:  likho-infra> bash scripts/up.sh   (or .\stack.ps1 up)
  * Without it these tests are skipped locally; with LIKHO_REQUIRE_STACK=1 (set in CI) they fail instead.
@@ -14,7 +14,15 @@ import { createApp } from '../src/app.js';
 import { newId } from '../src/common/ids.js';
 import { Config, loadConfig } from '../src/config/config.js';
 import { MailService } from '../src/mail/mail.service.js';
-import { FakeLanguage, FakeMedia, FakeSearch, FakeServer, FakeTranscription, serve } from './fakes.js';
+import {
+  FakeInsights,
+  FakeLanguage,
+  FakeMedia,
+  FakeSearch,
+  FakeServer,
+  FakeTranscription,
+  serve,
+} from './fakes.js';
 
 const codec = StringCodec();
 
@@ -26,6 +34,7 @@ export interface Harness {
   transcription: FakeTranscription;
   language: FakeLanguage;
   search: FakeSearch;
+  insights: FakeInsights;
   /** The mails the service "sent" (SMTP_URL=memory:). */
   mail: MailService;
   nats: NatsConnection;
@@ -89,11 +98,13 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
   const transcription = new FakeTranscription();
   const language = new FakeLanguage();
   const search = new FakeSearch();
+  const insights = new FakeInsights();
   const servers: FakeServer[] = await Promise.all([
     serve((r) => media.routes(r)),
     serve((r) => transcription.routes(r)),
     serve((r) => language.routes(r)),
     serve((r) => search.routes(r)),
+    serve((r) => insights.routes(r)),
   ]);
 
   const config: Config = {
@@ -105,7 +116,9 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     TRANSCRIPTION_GRPC_ADDR: servers[1]!.address,
     LANGUAGE_GRPC_ADDR: servers[2]!.address,
     SEARCH_GRPC_ADDR: servers[3]!.address,
+    INSIGHTS_GRPC_ADDR: servers[4]!.address,
     CONSUMER_GROUP: schema,
+    CONSUMER_START: 'new', // the local stream keeps weeks of events; a test group has no use for them
     SMTP_URL: 'memory:',
     JOB_SWEEP_SECONDS: 0, // tests call sweepJobs() themselves
     BOOTSTRAP_ADMIN_EMAIL: 'admin@example.test',
@@ -140,6 +153,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     transcription,
     language,
     search,
+    insights,
     mail: app.get(MailService),
     nats,
     js,
@@ -151,7 +165,9 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
           ? 'likho-media'
           : subject.startsWith('likho.import')
             ? 'likho-connector-ameyo'
-            : 'likho-transcription',
+            : subject.startsWith('likho.insights')
+              ? 'likho-insights'
+              : 'likho-transcription',
         type,
         time: new Date().toISOString(),
         subject: String(data.recording_id ?? ''),

@@ -1,8 +1,9 @@
 /**
  * Live updates as server-sent events. The gateway keeps /events/ connections open and unbuffered.
  *
- *   GET /events/jobs/:id      the lines of one job as they are transcribed, then its end
- *   GET /events/recordings    every change to the workspace's recordings and jobs
+ *   GET /events/jobs/:id         the lines of one job as they are transcribed, then its end
+ *   GET /events/recordings       every change to the workspace's recordings and jobs
+ *   GET /events/recordings/:id   every change to one recording: its jobs, its status, its insights
  */
 import { Controller, Param, Sse } from '@nestjs/common';
 import { Observable } from 'rxjs';
@@ -39,7 +40,9 @@ export class LiveController {
     const subscription = this.live
       .watch(
         (update) =>
-          update.jobId === id || (update.kind === 'recording' && update.recordingId === job.recordingId),
+          update.jobId === id ||
+          ((update.kind === 'recording' || update.kind === 'insights') &&
+            update.recordingId === job.recordingId),
       )
       .subscribe((update) => deliver(update));
     const earlier = await this.live.tail(id);
@@ -58,6 +61,17 @@ export class LiveController {
       earlier.forEach(emit);
       buffered.forEach(emit);
       deliver = emit;
+      return () => subscription.unsubscribe();
+    });
+  }
+
+  @Sse('recordings/:id')
+  async recording(@CurrentUser() me: Principal, @Param('id') id: string): Promise<Observable<Sent>> {
+    await this.recordings.get(me.workspaceId, id); // not found when it is another workspace's
+    return new Observable<Sent>((observer) => {
+      const subscription = this.live
+        .watch((update) => update.recordingId === id && update.kind !== 'segment')
+        .subscribe((update) => observer.next(sent(update)));
       return () => subscription.unsubscribe();
     });
   }

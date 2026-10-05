@@ -181,6 +181,83 @@ enum ImportStatus {
   requested
 }
 
+"""
+One yes/no observation of the auditor’s form, answered from the transcript.
+"""
+type InsightCheck {
+  """yes, no, or na (the call gave no way to tell)."""
+  answer: String!
+
+  """
+  The line the answer rests on, quoted from the transcript; empty when none.
+  """
+  evidence: String!
+  key: String!
+  label: String!
+}
+
+"""One scored point of the auditor’s form."""
+type InsightScore {
+  key: String!
+  label: String!
+  max: Float!
+
+  """Why, in one sentence."""
+  reason: String!
+  score: Float!
+}
+
+"""
+What a language model says about a transcribed call: a summary, the products, the customer’s mood, and the auditor’s form pre-filled.
+"""
+type Insights {
+  checks: [InsightCheck!]!
+  createdAt: DateTime
+
+  """The version of the auditor’s form the checks and scores follow."""
+  formVersion: String!
+  id: String!
+  inputTokens: Int!
+
+  """What the customer wanted, in a few words."""
+  intent: String!
+
+  """The model that answered, e.g. anthropic/claude-sonnet-5-5."""
+  model: String!
+  outputTokens: Int!
+
+  """The products or services mentioned, as they were said."""
+  products: [String!]!
+  recordingId: String!
+  scoreMax: Float!
+  scoreTotal: Float!
+  scores: [InsightScore!]!
+
+  """The customer’s mood by the end: positive, neutral, negative or mixed."""
+  sentiment: String!
+
+  """A few sentences: who called about what, what was said, how it ended."""
+  summary: String!
+  transcriptId: String!
+
+  """The transcript version the insights were made from."""
+  transcriptVersion: Int!
+}
+
+"""Whether insights are made at all, and by which model."""
+type InsightsStatus {
+  """
+  False: no model is configured, so nothing is analysed and no transcript text leaves.
+  """
+  enabled: Boolean!
+
+  """The version of the auditor’s form in use."""
+  formVersion: String!
+
+  """The model’s name, empty when none is configured."""
+  model: String!
+}
+
 type Invitation {
   acceptedAt: DateTime
   createdAt: DateTime!
@@ -271,6 +348,11 @@ type Mutation {
   Takes up an invitation: the person chooses a name and a password and is signed in.
   """
   acceptInvitation(name: String!, password: String!, token: String!): Me!
+
+  """
+  Analyses the recording’s latest transcript now and answers with its insights; with force, again even when it has some.
+  """
+  analyseRecording(force: Boolean, id: String!): Insights!
 
   """Stops a waiting or running job."""
   cancelJob(id: String!): Job!
@@ -402,6 +484,14 @@ type Query {
   """Calls asked for from the dialer, newest first."""
   imports(after: String, first: Int, status: [ImportStatus!]): ImportPage!
 
+  """The newest insights of a recording, or null when it has none yet."""
+  insights(recordingId: String!): Insights
+
+  """
+  Whether insights are made at all (a model is configured) and by which model.
+  """
+  insightsStatus: InsightsStatus!
+
   """What an invitation link is for, before it is accepted."""
   invitation(token: String!): InvitationPreview!
 
@@ -469,6 +559,9 @@ type Recording {
   externalId: String!
   failureReason: String!
   id: String!
+
+  """What a language model says about the call, once it has been analysed."""
+  insights: Insights
 
   """The jobs of this recording, newest first."""
   jobs: [Job!]!

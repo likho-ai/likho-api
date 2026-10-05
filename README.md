@@ -6,7 +6,7 @@ connectors use **REST** with an API key. Everything else (audio, transcripts, vo
 in the other services; this one calls them over gRPC and listens to their events.
 
 NestJS 12, Apollo Server 5, PostgreSQL (Drizzle), Redis, NATS JetStream, Connect clients to
-likho-media, likho-transcription and likho-language.
+likho-media, likho-transcription, likho-language, likho-search and likho-insights.
 
 ## What it does
 
@@ -16,10 +16,12 @@ script  ── REST    /api/v1 ───┤── likho-api ──┬── likh
 browser ── SSE     /events ───┘               ├── likho-transcription (transcripts, cancel, engines)
                                               ├── likho-language      (glossary, spellings)
                                               ├── likho-search        (lines matching a few words)
+                                              ├── likho-insights      (what a model says about a call)
                    events on NATS ────────────┤   likho.media.ready / failed
                                               │   likho.live.segment
                                               │   likho.transcription.completed / failed
                                               │   likho.import.completed / failed   (a connector answers)
+                                              │   likho.insights.completed / failed (to the open pages)
                    publishes ─────────────────┘   likho.transcription.requested
                                                   likho.import.requested             (fetch this call from the dialer)
                                                   likho.recording.deleted
@@ -38,7 +40,11 @@ such as campaign, agent, disposition and call time, which a connector sets when 
 and the **vocabulary** (`glossary`, `spellings`, with how often each was heard and the last lines
 a spelling was applied to; `importGlossaryCsv` / `importSpellingsCsv` and `glossaryCsv` /
 `spellingsCsv`, or `GET` / `POST /api/v1/vocabulary/glossary.csv` and `spellings.csv` with the
-file as the body).
+file as the body), and **insights** (`insights(recordingId)` and `recording { insights }` /
+`GET /api/v1/recordings/:id/insights` - what a language model says about the call: a summary,
+the products, the customer's mood, and the auditor's form pre-filled; `analyseRecording(id, force)`
+/ `POST` asks for them now; `insightsStatus` / `GET /api/v1/insights/status` says whether a model
+is configured at all, because without one nothing is analysed and no transcript text leaves).
 
 A recording's life, as the API sees it:
 
@@ -114,7 +120,7 @@ Then, through the gateway at http://localhost:8080:
 | --- | --- |
 | `POST /graphql` | The GraphQL API; `schema.graphql` in this repository is the schema |
 | `GET /api/docs`, `GET /api/openapi.json` | The REST API, described; `openapi.json` and the Postman collection in `postman/` are the same |
-| `GET /events/jobs/:id`, `GET /events/recordings` | Live updates as server-sent events |
+| `GET /events/jobs/:id`, `GET /events/recordings`, `GET /events/recordings/:id` | Live updates as server-sent events: one job's lines and end; everything in the workspace; one recording's jobs, status and insights |
 | `GET /healthz`, `GET /readyz` | Alive; database, Redis and bus answer |
 
 With Docker, on the stack's network:
@@ -125,7 +131,8 @@ docker run --rm --network likho -p 4000:4000 \
   -e DATABASE_URL=postgres://likho_api:likho_api@postgres:5432/likho_api \
   -e REDIS_URL=redis://redis:6379 -e NATS_URL=nats://nats:4222 \
   -e MEDIA_GRPC_ADDR=likho-media:5010 -e TRANSCRIPTION_GRPC_ADDR=likho-transcription:5020 \
-  -e LANGUAGE_GRPC_ADDR=likho-language:5030 \
+  -e LANGUAGE_GRPC_ADDR=likho-language:5030 -e SEARCH_GRPC_ADDR=likho-search:5040 \
+  -e INSIGHTS_GRPC_ADDR=likho-insights:5050 \
   -e BOOTSTRAP_ADMIN_EMAIL=you@example.com -e BOOTSTRAP_ADMIN_PASSWORD=choose-one \
   likho-api
 ```
@@ -151,6 +158,9 @@ query { recording(id: "rec_...") {
 
 While a job runs, `GET /events/jobs/<job id>` streams `segment` events (`textScript`,
 `textRoman`, `startSeconds`, `endSeconds`) and ends with a `job` event whose `status` is `done`.
+`GET /events/recordings/<recording id>` streams the `job`, `recording` and `insights` events of
+one recording: when the model's answer is in (`status: done`, with the sentiment and the score)
+the page fetches `recording { insights { ... } }`.
 
 ## A script, in REST
 
@@ -188,7 +198,7 @@ ConfigMaps and Secrets.
 | `DATABASE_URL` | local stack, database `likho_api` | PostgreSQL; tables are created on start |
 | `REDIS_URL` | `redis://localhost:6380` | Live updates between instances |
 | `NATS_URL` | `nats://localhost:4222` | Event bus |
-| `MEDIA_GRPC_ADDR`, `TRANSCRIPTION_GRPC_ADDR`, `LANGUAGE_GRPC_ADDR`, `SEARCH_GRPC_ADDR` | `localhost:5010/5020/5030/5040` | The other services |
+| `MEDIA_GRPC_ADDR`, `TRANSCRIPTION_GRPC_ADDR`, `LANGUAGE_GRPC_ADDR`, `SEARCH_GRPC_ADDR`, `INSIGHTS_GRPC_ADDR` | `localhost:5010/5020/5030/5040/5050` | The other services |
 | `IMPORT_SOURCE` | `ameyo` | The connector that answers `requestImport` by default; empty = imports are off |
 | `PUBLIC_ORIGIN` | `http://localhost:8080` | The address browsers use; https makes cookies Secure |
 | `SESSION_SECRET` | a development value | Keys sessions and API keys; required in production |
@@ -198,6 +208,7 @@ ConfigMaps and Secrets.
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_WORKSPACE_NAME` | unset | The first admin and workspace, made when there are no users |
 | `CONSUMERS_ENABLED` | `true` | Take events from the bus (and sweep jobs) |
 | `CONSUMER_GROUP` | `likho-api` | Instances with the same name share the events |
+| `CONSUMER_START` | `all` | Where a group new to the bus starts: `all` takes every event still on the stream, `new` only those from now on |
 | `NATS_CONNECT_TIMEOUT_SECONDS` | `120` | How long to keep trying to reach NATS at start |
 | `JOB_SWEEP_SECONDS` | `60` | How often stuck and stalled jobs are looked for; 0 = never |
 | `JOB_QUEUED_MAX_MINUTES` | `15` | A job still queued after this is asked for again, then failed (`no_worker`) |
@@ -216,6 +227,6 @@ pnpm db:generate   # a new SQL migration after a change to src/db/schema.ts
 ```
 
 The tests run the real application against PostgreSQL (each run in its own schema), NATS and
-Redis, with likho-media, likho-transcription and likho-language replaced by small gRPC servers
-in the test process. Without the stack they are skipped; with `LIKHO_REQUIRE_STACK=1` (set in CI)
+Redis, with likho-media, likho-transcription, likho-language, likho-search and likho-insights
+replaced by small gRPC servers in the test process. Without the stack they are skipped; with `LIKHO_REQUIRE_STACK=1` (set in CI)
 they fail instead.

@@ -6,6 +6,7 @@
  *   likho.live.segment                    a line was transcribed (to the browsers, and progress)
  *   likho.transcription.completed/failed  a job ended
  *   likho.import.completed/failed         the connector fetched a call, or could not
+ *   likho.insights.completed/failed       the model's answer about a transcript is in, or not (to the browsers)
  *
  * Every event is applied once: ids are remembered, so a redelivery changes nothing twice.
  */
@@ -101,6 +102,44 @@ export class EventsConsumer implements OnModuleInit {
           String(data.code ?? 'error'),
           String(data.reason ?? ''),
         ),
+      ),
+    });
+    // The insights live in likho-insights; the open pages only hear that they are there (or not).
+    await this.bus.consume({
+      stream: 'LIKHO',
+      durable: 'insights-completed',
+      subject: 'likho.insights.completed',
+      handler: this.once((data) =>
+        this.live.publish({
+          kind: 'insights',
+          recordingId: String(data.recording_id),
+          data: {
+            status: 'done',
+            transcriptId: String(data.transcript_id),
+            insightsId: String(data.insights_id),
+            sentiment: String(data.sentiment ?? ''),
+            scoreTotal: Number(data.score_total ?? 0),
+            scoreMax: Number(data.score_max ?? 0),
+            model: String(data.model ?? ''),
+          },
+        }),
+      ),
+    });
+    await this.bus.consume({
+      stream: 'LIKHO',
+      durable: 'insights-failed',
+      subject: 'likho.insights.failed',
+      handler: this.once((data) =>
+        this.live.publish({
+          kind: 'insights',
+          recordingId: String(data.recording_id),
+          data: {
+            status: 'failed',
+            transcriptId: String(data.transcript_id),
+            code: String(data.code ?? 'error'),
+            message: String(data.message ?? ''),
+          },
+        }),
       ),
     });
     // Live lines are only useful now: no need to catch up on old ones.

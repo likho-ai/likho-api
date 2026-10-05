@@ -14,6 +14,9 @@ import { DbModule } from './db/db.module.js';
 import { HealthController } from './health/health.controller.js';
 import { ImportsResolver } from './imports/imports.resolver.js';
 import { ImportsService } from './imports/imports.service.js';
+import { InsightsController } from './insights/insights.controller.js';
+import { InsightsResolver } from './insights/insights.resolver.js';
+import { InsightsService } from './insights/insights.service.js';
 import { LiveController } from './live/live.controller.js';
 import { LiveModule } from './live/live.module.js';
 import { MetricsModule } from './metrics/metrics.module.js';
@@ -86,6 +89,7 @@ export function appModule(config?: Config) {
       SearchController,
       ImportsController,
       VocabularyController,
+      InsightsController,
       LiveController,
     ],
     providers: [
@@ -94,6 +98,7 @@ export function appModule(config?: Config) {
       SearchService,
       SavedSearchesService,
       VocabularyService,
+      InsightsService,
       EventsConsumer,
       JobsSweeper,
       RecordingsResolver,
@@ -102,6 +107,7 @@ export function appModule(config?: Config) {
       ImportsResolver,
       TranscriptsResolver,
       VocabularyResolver,
+      InsightsResolver,
       SettingsResolver,
       UsersResolver,
       AuditResolver,

@@ -1,6 +1,6 @@
 {
   "name": "likho-api",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Likho API: login, workspaces, recordings, jobs and live lines; GraphQL for the web apps, REST for scripts and connectors",
   "private": true,
   "type": "module",
@@ -27,7 +27,7 @@
     "@bufbuild/protobuf": "^2.16.0",
     "@connectrpc/connect": "2.2.0",
     "@connectrpc/connect-node": "^2.2.0",
-    "@likho-ai/contracts": "https://github.com/likho-ai/likho-contracts/releases/download/v0.10.0/likho-ai-contracts-0.10.0.tgz",
+    "@likho-ai/contracts": "https://github.com/likho-ai/likho-contracts/releases/download/v0.11.0/likho-ai-contracts-0.11.0.tgz",
     "@nestjs/apollo": "^14.0.3",
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",

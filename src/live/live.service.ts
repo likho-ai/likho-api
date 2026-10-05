@@ -11,8 +11,11 @@ import { Observable } from 'rxjs';
 import { CONFIG, type Config } from '../config/config.js';
 
 export interface LiveUpdate {
-  /** 'segment' (a transcribed line), 'job' (status or progress), 'recording' (status). */
-  kind: 'segment' | 'job' | 'recording' | 'import';
+  /**
+   * 'segment' (a transcribed line), 'job' (status or progress), 'recording' (status),
+   * 'import' (a call fetched from a dialer), 'insights' (the model's answer is in, or not).
+   */
+  kind: 'segment' | 'job' | 'recording' | 'import' | 'insights';
   jobId?: string;
   recordingId: string;
   /** For updates that are not about one recording yet (an import): whose they are. */

@@ -2,6 +2,7 @@
  * The whole service: GraphQL for browsers, REST for scripts, events from the other services,
  * live updates. Runs against the local stack; see harness.ts.
  */
+import { newId } from '../src/common/ids.js';
 import { Browser, Harness, readEvents, requireStack, start, until } from './harness.js';
 
 const RECORDING = `
@@ -1316,6 +1317,196 @@ describe.skipIf(!stackUp)('likho-api', () => {
     });
   });
 
+  describe('insights', () => {
+    const INSIGHTS = `query ($id: String!) { insights(recordingId: $id) {
+      id transcriptId recordingId transcriptVersion summary intent products sentiment
+      checks { key label answer evidence } scores { key label score max reason } scoreTotal scoreMax
+      model inputTokens outputTokens formVersion createdAt
+    } }`;
+    const ANALYSE = `mutation ($id: String!, $force: Boolean) { analyseRecording(id: $id, force: $force) { id transcriptId } }`;
+
+    /** A recording whose transcript is done. */
+    async function transcribed(name: string) {
+      const recording = await readyRecording(admin, name);
+      const workspaceId = h.media.uploads.at(-1)!.workspaceId;
+      const transcript = h.transcription.add(newId('trn'), recording.id, recording.jobs[0].id);
+      await h.publish('likho.transcription.completed', 'likho.transcription.completed.v1', {
+        job_id: recording.jobs[0].id,
+        recording_id: recording.id,
+        transcript_id: transcript.id,
+        workspace_id: workspaceId,
+        version: 1,
+        language: { detected: 'hi', probability: 0.9, candidates: [], decoded_as: 'hi', policy: 'auto' },
+        stats: {
+          audio_seconds: 61.5,
+          elapsed_seconds: 40,
+          segments: 2,
+          chunks: 6,
+          silence_skipped_seconds: 3,
+        },
+      });
+      await until(async () => {
+        const { recording: r } = await admin.ok(GET_RECORDING, { id: recording.id });
+        return r.status === 'done' ? r : null;
+      }, `the transcript of ${name}`);
+      return { recording, transcript, workspaceId };
+    }
+
+    it('a transcribed call gets its insights, and the page watching the call hears so', async () => {
+      const { recording, transcript, workspaceId } = await transcribed('insights.mp3');
+      expect((await admin.ok(INSIGHTS, { id: recording.id })).insights).toBeNull();
+      const { recording: bare } = await admin.ok(
+        `query ($id: String!) { recording(id: $id) { insights { id } } }`,
+        { id: recording.id },
+      );
+      expect(bare.insights).toBeNull();
+
+      // likho-insights analysed the transcript and said so; the open page hears it and fetches.
+      const watching = readEvents(h.url, `/events/recordings/${recording.id}`, admin.cookie, (events) =>
+        events.some((e) => e.type === 'insights'),
+      );
+      const made = h.insights.add(transcript.id, recording.id, workspaceId);
+      await h.publish('likho.insights.completed', 'likho.insights.completed.v1', {
+        insights_id: made.id,
+        transcript_id: transcript.id,
+        recording_id: recording.id,
+        workspace_id: workspaceId,
+        model: 'fake/one',
+        sentiment: 'positive',
+        score_total: 13,
+        score_max: 15,
+        input_tokens: 100,
+        output_tokens: 50,
+      });
+      const events = await watching;
+      expect(events.find((e) => e.type === 'insights')!.data).toEqual({
+        recordingId: recording.id,
+        status: 'done',
+        transcriptId: transcript.id,
+        insightsId: made.id,
+        sentiment: 'positive',
+        scoreTotal: 13,
+        scoreMax: 15,
+        model: 'fake/one',
+      });
+
+      const { insights } = await admin.ok(INSIGHTS, { id: recording.id });
+      expect(insights).toMatchObject({
+        id: made.id,
+        transcriptId: transcript.id,
+        recordingId: recording.id,
+        transcriptVersion: 1,
+        intent: 'order a product',
+        products: ['Ashwagandha'],
+        sentiment: 'positive',
+        scoreTotal: 13,
+        scoreMax: 15,
+        model: 'fake/one',
+        inputTokens: 100,
+        outputTokens: 50,
+        formVersion: 'example-1',
+      });
+      expect(insights.summary).toContain('the order was placed');
+      expect(insights.checks).toEqual([
+        { key: 'greeting', label: 'The agent greeted the customer', answer: 'yes', evidence: 'namaste' },
+        { key: 'closing', label: 'The agent closed the call properly', answer: 'na', evidence: '' },
+      ]);
+      expect(insights.scores[1]).toEqual({
+        key: 'resolution',
+        label: 'The need was handled',
+        score: 9,
+        max: 10,
+        reason: 'The order was placed.',
+      });
+      expect(insights.createdAt).toBeTruthy();
+      const { recording: shown } = await admin.ok(
+        `query ($id: String!) { recording(id: $id) { insights { id summary } } }`,
+        { id: recording.id },
+      );
+      expect(shown.insights).toMatchObject({ id: made.id });
+
+      // Asked again, by force: likho-insights is asked about this transcript, and it is audited.
+      const { analyseRecording } = await admin.ok(ANALYSE, { id: recording.id, force: true });
+      expect(analyseRecording).toEqual({ id: made.id, transcriptId: transcript.id });
+      expect(h.insights.asked.at(-1)).toEqual({ transcriptId: transcript.id, workspaceId, force: true });
+
+      // A failure is heard too.
+      const failing = readEvents(h.url, `/events/recordings/${recording.id}`, admin.cookie, (events) =>
+        events.some((e) => e.type === 'insights' && e.data.status === 'failed'),
+      );
+      await h.publish('likho.insights.failed', 'likho.insights.failed.v1', {
+        transcript_id: transcript.id,
+        recording_id: recording.id,
+        workspace_id: workspaceId,
+        code: 'model_error',
+        message: 'The model is rate limited',
+        attempt: 1,
+      });
+      expect((await failing).find((e) => e.type === 'insights')!.data).toEqual({
+        recordingId: recording.id,
+        status: 'failed',
+        transcriptId: transcript.id,
+        code: 'model_error',
+        message: 'The model is rate limited',
+      });
+
+      // Over REST too, with the session or an API key.
+      const headers = { cookie: admin.cookie };
+      const rest = await (
+        await fetch(`${h.url}/api/v1/recordings/${recording.id}/insights`, { headers })
+      ).json();
+      expect(rest).toMatchObject({ id: made.id, sentiment: 'positive', scoreTotal: 13 });
+      expect(typeof rest.createdAt).toBe('string');
+      const again = await (
+        await fetch(`${h.url}/api/v1/recordings/${recording.id}/insights`, {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ force: false }),
+        })
+      ).json();
+      expect(again).toMatchObject({ id: made.id });
+      expect(h.insights.asked.at(-1)).toEqual({ transcriptId: transcript.id, workspaceId, force: false });
+      const status = await (await fetch(`${h.url}/api/v1/insights/status`, { headers })).json();
+      expect(status).toEqual({ enabled: true, model: 'fake/one', formVersion: 'example-1' });
+    });
+
+    it('a recording without a transcript, or of another workspace, has nothing to show', async () => {
+      const { requestUpload } = await admin.ok(REQUEST_UPLOAD, {
+        input: { originalName: 'insights-2.mp3', sizeBytes: 10 },
+      });
+      const id = requestUpload.recording.id;
+      expect((await admin.ok(INSIGHTS, { id })).insights).toBeNull();
+      expect(await admin.fails(ANALYSE, { id })).toBe('invalid');
+      const missing = await fetch(`${h.url}/api/v1/recordings/${id}/insights`, {
+        headers: { cookie: admin.cookie },
+      });
+      expect(missing.status).toBe(404);
+
+      const other = new Browser(h.url);
+      await other.login('other@example.test', 'other-password-1');
+      expect(await other.fails(INSIGHTS, { id })).toBe('not_found');
+      expect(await other.fails(ANALYSE, { id })).toBe('not_found');
+      const stream = await fetch(`${h.url}/events/recordings/${id}`, {
+        headers: { cookie: other.cookie, accept: 'text/event-stream' },
+      });
+      expect(stream.status).toBe(404);
+    });
+
+    it('without a model, insights are off and asking for them says so', async () => {
+      const { recording } = await transcribed('insights-3.mp3');
+      h.insights.enabled = false;
+      try {
+        const { insightsStatus } = await admin.ok(`{ insightsStatus { enabled model formVersion } }`);
+        expect(insightsStatus).toEqual({ enabled: false, model: '', formVersion: 'example-1' });
+        const { errors } = await admin.graphql(ANALYSE, { id: recording.id });
+        expect(errors?.[0]).toMatchObject({ extensions: { code: 'invalid' } });
+        expect(errors?.[0]?.message).toContain('No model is configured');
+      } finally {
+        h.insights.enabled = true;
+      }
+    });
+  });
+
   describe('the audit log', () => {
     it('has every change, with who did it and to what', async () => {
       const { auditLog } = await admin.ok(
@@ -1346,6 +1537,7 @@ describe.skipIf(!stackUp)('likho-api', () => {
         'glossary.imported',
         'spelling.added',
         'spelling.imported',
+        'insights.requested',
         'spelling.deleted',
         'search.saved',
         'search.deleted',

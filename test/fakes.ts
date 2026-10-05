@@ -1,5 +1,5 @@
 /**
- * The three services as likho-api sees them, answering real gRPC on local ports.
+ * The other services as likho-api sees them, answering real gRPC on local ports.
  * Tests change what they answer and read what they were asked.
  */
 import { Code, ConnectError, ConnectRouter } from '@connectrpc/connect';
@@ -7,6 +7,7 @@ import { connectNodeAdapter } from '@connectrpc/connect-node';
 import { create } from '@bufbuild/protobuf';
 import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { Script } from '@likho-ai/contracts/common/v1/common_pb';
+import { InsightsSchema, InsightsService } from '@likho-ai/contracts/insights/v1/insights_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
 import { HitSchema, SearchService, type Hit } from '@likho-ai/contracts/search/v1/search_pb';
@@ -352,6 +353,83 @@ export class FakeSearch {
         this.deleted.push(req.recordingId);
         return {};
       },
+    });
+  }
+}
+
+/** likho-insights: the insights a test put in, by transcript; remembers what it was asked to analyse. */
+export class FakeInsights {
+  docs = new Map<string, Record<string, any>>();
+  asked: { transcriptId: string; workspaceId: string; force: boolean }[] = [];
+  /** False: no model is configured there, as when ANTHROPIC_API_KEY is empty. */
+  enabled = true;
+
+  /** The insights of a transcript, as the model would have made them. */
+  add(transcriptId: string, recordingId: string, workspaceId: string, extra: Record<string, unknown> = {}) {
+    const doc: Record<string, any> = {
+      id: newId('ins'),
+      transcriptId,
+      recordingId,
+      workspaceId,
+      transcriptVersion: 1,
+      summary:
+        'A customer asked about a product; the agent gave the price and the delivery; the order was placed.',
+      intent: 'order a product',
+      products: ['Ashwagandha'],
+      sentiment: 'positive',
+      checks: [
+        { key: 'greeting', label: 'The agent greeted the customer', answer: 'yes', evidence: 'namaste' },
+        { key: 'closing', label: 'The agent closed the call properly', answer: 'na', evidence: '' },
+      ],
+      scores: [
+        { key: 'communication', label: 'Clarity and tone', score: 4, max: 5, reason: 'Clear and polite.' },
+        {
+          key: 'resolution',
+          label: 'The need was handled',
+          score: 9,
+          max: 10,
+          reason: 'The order was placed.',
+        },
+      ],
+      scoreTotal: 13,
+      scoreMax: 15,
+      model: 'fake/one',
+      inputTokens: 100,
+      outputTokens: 50,
+      formVersion: 'example-1',
+      createdAt: timestampFromDate(new Date()),
+      ...extra,
+    };
+    this.docs.set(transcriptId, doc);
+    return doc;
+  }
+
+  routes(router: ConnectRouter) {
+    router.service(InsightsService, {
+      getInsights: (req) => {
+        const doc = req.transcriptId
+          ? this.docs.get(req.transcriptId)
+          : [...this.docs.values()].filter((d) => d.recordingId === req.recordingId).at(-1);
+        if (!doc) throw new ConnectError('no insights for it yet', Code.NotFound);
+        return { insights: create(InsightsSchema, doc) };
+      },
+      analyse: (req) => {
+        this.asked.push({ transcriptId: req.transcriptId, workspaceId: req.workspaceId, force: req.force });
+        if (!this.enabled)
+          throw new ConnectError(
+            'No model is configured (ANTHROPIC_API_KEY is empty): nothing is analysed and no text leaves.',
+            Code.FailedPrecondition,
+          );
+        const doc = this.docs.get(req.transcriptId);
+        if (!doc) throw new ConnectError(`Transcript ${req.transcriptId} was not found`, Code.NotFound);
+        if (req.force) doc.createdAt = timestampFromDate(new Date());
+        return { insights: create(InsightsSchema, doc) };
+      },
+      getStatus: () => ({
+        enabled: this.enabled,
+        model: this.enabled ? 'fake/one' : '',
+        formVersion: 'example-1',
+      }),
     });
   }
 }

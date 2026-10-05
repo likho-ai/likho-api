@@ -23,6 +23,7 @@ const schema = z.object({
   TRANSCRIPTION_GRPC_ADDR: z.string().default('localhost:5020'),
   LANGUAGE_GRPC_ADDR: z.string().default('localhost:5030'),
   SEARCH_GRPC_ADDR: z.string().default('localhost:5040'),
+  INSIGHTS_GRPC_ADDR: z.string().default('localhost:5050'),
   /** Which connector answers import requests by default ('ameyo'). Empty = imports are off. */
   IMPORT_SOURCE: z.string().default('ameyo'),
   RPC_TIMEOUT_SECONDS: seconds.default(10),
@@ -54,6 +55,11 @@ const schema = z.object({
     .transform((v) => v === 'true'),
   /** A durable consumer name per instance group; instances with the same name share the work. */
   CONSUMER_GROUP: z.string().default('likho-api'),
+  /**
+   * Where a consumer group that is new to the bus starts: 'all' takes every event kept on the
+   * stream (so nothing is missed when the group's name changes), 'new' only those from now on.
+   */
+  CONSUMER_START: z.enum(['all', 'new']).default('all'),
   /** How long to keep trying to reach NATS at start before giving up. */
   NATS_CONNECT_TIMEOUT_SECONDS: seconds.default(120),
 
