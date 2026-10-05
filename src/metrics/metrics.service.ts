@@ -67,6 +67,10 @@ export class MetricsService implements OnModuleDestroy {
     this.sweeps = this.meter.createCounter('likho_job_sweeps', {
       description: 'What the job sweeper did to stuck or stalled jobs',
     });
+    // The known label sets start at 0, so Prometheus sees the first real increment as an
+    // increase; a counter born at 1 shows no rate until the second one.
+    for (const status of ['done', 'failed', 'cancelled']) this.jobsFinished.add(0, { status });
+    for (const outcome of ['requeued', 'failed']) this.sweeps.add(0, { outcome });
     this.meter
       .createObservableGauge('likho_jobs', { description: 'Jobs by status' })
       .addCallback(async (result) => {
