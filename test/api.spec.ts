@@ -567,6 +567,100 @@ describe.skipIf(!stackUp)('likho-api', () => {
     });
   });
 
+  describe('jobs that get stuck', () => {
+    const JOB = `query ($id: String!) { job(id: $id) { id status attempt errorCode errorMessage lastProgressAt } }`;
+    const long_ago = new Date(Date.now() - 3_600_000);
+
+    async function age(jobId: string, status?: 'queued' | 'running') {
+      const { jobs } = await import('../src/db/schema.js');
+      const { eq } = await import('drizzle-orm');
+      const db = h.app.get((await import('../src/db/db.module.js')).DbService).db;
+      await db
+        .update(jobs)
+        .set({ lastProgressAt: long_ago, ...(status ? { status, startedAt: long_ago } : {}) })
+        .where(eq(jobs.id, jobId));
+    }
+    async function sweep() {
+      const service = h.app.get((await import('../src/recordings/recordings.service.js')).RecordingsService);
+      return service.sweepJobs();
+    }
+
+    beforeAll(async () => {
+      await admin.ok(`mutation { updateSettings(autoTranscribe: false) { autoTranscribe } }`);
+    });
+    afterAll(async () => {
+      await admin.ok(`mutation { updateSettings(autoTranscribe: true) { autoTranscribe } }`);
+    });
+
+    it('a job nobody took is asked for again, then failed', async () => {
+      const recording = await readyRecording(admin, 'stuck.mp3', 'ready');
+      const { createJob } = await admin.ok(
+        `mutation ($id: String!) { createJob(input: { recordingId: $id }) { id attempt lastProgressAt } }`,
+        { id: recording.id },
+      );
+      expect(createJob.attempt).toBe(1);
+      expect(createJob.lastProgressAt).not.toBeNull();
+      // Young: nothing to do.
+      expect(await sweep()).toEqual({ requeued: 0, failed: 0 });
+
+      await age(createJob.id);
+      expect(await sweep()).toEqual({ requeued: 1, failed: 0 });
+      const asked = h
+        .published('likho.transcription.requested')
+        .filter((e) => e.data.job_id === createJob.id);
+      expect(asked.map((e) => e.data.attempt)).toEqual([1, 2]);
+      const { job } = await admin.ok(JOB, { id: createJob.id });
+      expect(job).toMatchObject({ status: 'queued', attempt: 2 });
+
+      // Still nobody: the second try was the last.
+      await age(createJob.id);
+      expect(await sweep()).toEqual({ requeued: 0, failed: 1 });
+      const { job: failed } = await admin.ok(JOB, { id: createJob.id });
+      expect(failed).toMatchObject({ status: 'failed', errorCode: 'no_worker' });
+      expect(failed.errorMessage).toContain('No worker took the job');
+      const { recording: after } = await admin.ok(GET_RECORDING, { id: recording.id });
+      expect(after.status).toBe('ready');
+    });
+
+    it('a job whose worker went quiet is stopped, failed and tried once more', async () => {
+      const recording = await readyRecording(admin, 'stall.mp3', 'ready');
+      const { createJob } = await admin.ok(
+        `mutation ($id: String!) { createJob(input: { recordingId: $id, languagePolicy: "hi" }) { id } }`,
+        { id: recording.id },
+      );
+      await age(createJob.id, 'running');
+      expect(await sweep()).toEqual({ requeued: 1, failed: 1 });
+      expect(h.transcription.cancelled).toContain(createJob.id);
+      const { jobs: list } = await admin.ok(
+        `query ($id: String!) { jobs(recordingId: $id) { id status attempt errorCode languagePolicy } }`,
+        { id: recording.id },
+      );
+      expect(list).toHaveLength(2);
+      expect(list[0]).toMatchObject({ status: 'queued', attempt: 2, languagePolicy: 'hi' });
+      expect(list[1]).toMatchObject({ id: createJob.id, status: 'failed', attempt: 1, errorCode: 'stalled' });
+      const { recording: mid } = await admin.ok(GET_RECORDING, { id: recording.id });
+      expect(mid.status).toBe('queued');
+
+      // The second try stalls as well: that was the last one.
+      await age(list[0].id, 'running');
+      expect(await sweep()).toEqual({ requeued: 0, failed: 1 });
+      const { recording: after } = await admin.ok(GET_RECORDING, { id: recording.id });
+      expect(after.status).toBe('ready');
+      expect(after.jobs.map((j: any) => j.status)).toEqual(['failed', 'failed']);
+    });
+
+    it('/metrics says how many jobs are in each state', async () => {
+      const response = await fetch(`${h.url}/metrics`);
+      expect(response.status).toBe(200);
+      const text = await response.text();
+      expect(text).toMatch(/likho_jobs\{[^}]*status="failed"[^}]*\} [1-9]/);
+      expect(text).toMatch(/likho_jobs_finished_total\{[^}]*status="failed"[^}]*\} [1-9]/);
+      expect(text).toMatch(/likho_job_sweeps_total\{[^}]*outcome="requeued"[^}]*\} 2/);
+      expect(text).toContain('likho_jobs_queue_oldest_seconds');
+      expect(text).toMatch(/likho_events_handled_total\{[^}]*outcome="ok"/);
+    });
+  });
+
   describe('people and roles', () => {
     let inviteLink = '';
     let viewerId = '';

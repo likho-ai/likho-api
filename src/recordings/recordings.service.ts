@@ -22,6 +22,7 @@ import {
 } from '../db/schema.js';
 import { BusService, event } from '../bus/bus.service.js';
 import { LiveService } from '../live/live.service.js';
+import { MetricsService } from '../metrics/metrics.service.js';
 
 export type RecordingRow = typeof recordings.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
@@ -85,7 +86,13 @@ export class RecordingsService {
     private readonly clients: Clients,
     private readonly bus: BusService,
     private readonly live: LiveService,
-  ) {}
+    private readonly metrics: MetricsService,
+  ) {
+    metrics.observeJobs(
+      () => this.jobCounts(),
+      () => this.oldestQueuedSeconds(),
+    );
+  }
 
   private get db() {
     return this.dbs.db;
@@ -307,7 +314,12 @@ export class RecordingsService {
     return this.queue(recording, userId, input);
   }
 
-  private async queue(recording: RecordingRow, userId: string | null, input: JobRequest): Promise<JobRow> {
+  private async queue(
+    recording: RecordingRow,
+    userId: string | null,
+    input: JobRequest,
+    attempt = 1,
+  ): Promise<JobRow> {
     const languagePolicy = input.languagePolicy?.trim() || 'auto';
     if (!/^[a-z]{2,8}$/.test(languagePolicy)) throw invalid('languagePolicy is "auto" or a language code.');
     const [job] = await this.db
@@ -320,21 +332,12 @@ export class RecordingsService {
         languagePolicy,
         force: input.force ?? false,
         totalSeconds: recording.durationSeconds,
+        attempt,
         createdBy: userId,
+        lastProgressAt: new Date(),
       })
       .returning();
-    await this.bus.publish(
-      'likho.transcription.requested',
-      event('likho.transcription.requested.v1', recording.id, {
-        job_id: job!.id,
-        recording_id: recording.id,
-        media_id: recording.mediaId,
-        workspace_id: recording.workspaceId,
-        model_registry_id: job!.modelRegistryId,
-        language_policy: job!.languagePolicy,
-        force: job!.force,
-      }),
-    );
+    await this.request(job!, recording);
     await this.setRecordingStatus(recording.id, 'queued');
     await this.live.publish({
       kind: 'job',
@@ -342,8 +345,121 @@ export class RecordingsService {
       recordingId: recording.id,
       data: { status: 'queued' },
     });
-    this.log.log(`job ${job!.id} queued for recording ${recording.id}`);
+    this.log.log(
+      `job ${job!.id} queued for recording ${recording.id}${attempt > 1 ? ` (try ${attempt})` : ''}`,
+    );
     return job!;
+  }
+
+  /** Tells the workers about a job. */
+  private async request(job: JobRow, recording: Pick<RecordingRow, 'id' | 'mediaId' | 'workspaceId'>) {
+    await this.bus.publish(
+      'likho.transcription.requested',
+      event('likho.transcription.requested.v1', recording.id, {
+        job_id: job.id,
+        recording_id: recording.id,
+        media_id: recording.mediaId,
+        workspace_id: recording.workspaceId,
+        model_registry_id: job.modelRegistryId,
+        language_policy: job.languagePolicy,
+        force: job.force,
+        attempt: job.attempt,
+      }),
+    );
+  }
+
+  // ---------------------------------------------------------------- stuck and stalled jobs
+
+  /**
+   * A job still queued after JOB_QUEUED_MAX_MINUTES is asked for again, once; after that it
+   * fails ("no worker"). A running job with no line for JOB_STALL_MAX_MINUTES is stopped and
+   * failed ("stalled"), and a fresh job is queued once more. Safe to run on every instance.
+   */
+  async sweepJobs(now = new Date()): Promise<{ requeued: number; failed: number }> {
+    const done = { requeued: 0, failed: 0 };
+    const queuedMax = this.config.JOB_QUEUED_MAX_MINUTES;
+    const stallMax = this.config.JOB_STALL_MAX_MINUTES;
+    const tries = this.config.JOB_MAX_ATTEMPTS;
+
+    const stuck = await this.db
+      .select()
+      .from(jobs)
+      .where(
+        and(eq(jobs.status, 'queued'), lt(jobs.lastProgressAt, new Date(now.getTime() - queuedMax * 60_000))),
+      );
+    for (const job of stuck) {
+      if (job.attempt < tries) {
+        const [again] = await this.db
+          .update(jobs)
+          .set({ attempt: job.attempt + 1, lastProgressAt: now })
+          .where(and(eq(jobs.id, job.id), eq(jobs.status, 'queued')))
+          .returning();
+        if (!again) continue;
+        const [recording] = await this.db.select().from(recordings).where(eq(recordings.id, job.recordingId));
+        if (!recording) continue;
+        await this.request(again, recording);
+        this.log.warn(`job ${job.id} was queued for ${queuedMax} min with no worker: asked for again`);
+        this.metrics.sweeps.add(1, { outcome: 'requeued' });
+        done.requeued++;
+      } else {
+        await this.onJobFailed(job.id, 'no_worker', `No worker took the job in ${queuedMax} minutes, twice.`);
+        this.metrics.sweeps.add(1, { outcome: 'failed' });
+        done.failed++;
+      }
+    }
+
+    const stalled = await this.db
+      .select()
+      .from(jobs)
+      .where(
+        and(eq(jobs.status, 'running'), lt(jobs.lastProgressAt, new Date(now.getTime() - stallMax * 60_000))),
+      );
+    for (const job of stalled) {
+      try {
+        await this.clients.transcription.cancelJob({ jobId: job.id });
+      } catch {
+        /* the worker may be gone; that is the point */
+      }
+      await this.onJobFailed(job.id, 'stalled', `No progress for ${stallMax} minutes.`);
+      this.metrics.sweeps.add(1, { outcome: 'failed' });
+      done.failed++;
+      if (job.attempt < tries) {
+        const [recording] = await this.db.select().from(recordings).where(eq(recordings.id, job.recordingId));
+        if (!recording) continue;
+        await this.queue(
+          recording,
+          job.createdBy,
+          { modelRegistryId: job.modelRegistryId, languagePolicy: job.languagePolicy, force: job.force },
+          job.attempt + 1,
+        );
+        this.log.warn(`job ${job.id} stalled after ${stallMax} min: failed, and tried once more`);
+        this.metrics.sweeps.add(1, { outcome: 'requeued' });
+        done.requeued++;
+      } else {
+        this.log.warn(`job ${job.id} stalled after ${stallMax} min on its last try: failed`);
+      }
+    }
+    return done;
+  }
+
+  /** For the metrics: jobs by status. */
+  async jobCounts(): Promise<Record<string, number>> {
+    const rows = await this.db
+      .select({ status: jobs.status, count: sql<number>`count(*)::int` })
+      .from(jobs)
+      .groupBy(jobs.status);
+    const counts: Record<string, number> = Object.fromEntries(JOB_STATUSES.map((s) => [s, 0]));
+    for (const row of rows) counts[row.status] = row.count;
+    return counts;
+  }
+
+  /** For the metrics: how long the oldest waiting job has waited, in seconds. */
+  async oldestQueuedSeconds(): Promise<number> {
+    const [row] = await this.db
+      .select({ oldest: sql<number | null>`extract(epoch from now() - min(${jobs.createdAt}))` })
+      .from(jobs)
+      .where(eq(jobs.status, 'queued'));
+    return Number(row?.oldest ?? 0);
   }
 
   async getJob(workspaceId: string, id: string): Promise<JobRow> {
@@ -434,7 +550,7 @@ export class RecordingsService {
   async onJobStarted(jobId: string, totalSeconds: number): Promise<void> {
     const [job] = await this.db
       .update(jobs)
-      .set({ status: 'running', startedAt: new Date(), totalSeconds })
+      .set({ status: 'running', startedAt: new Date(), lastProgressAt: new Date(), totalSeconds })
       .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued')))
       .returning();
     if (!job) return;
@@ -455,6 +571,7 @@ export class RecordingsService {
         totalSeconds,
         status: 'running',
         startedAt: sql`coalesce(${jobs.startedAt}, now())`,
+        lastProgressAt: new Date(),
       })
       .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running'])));
   }
@@ -480,6 +597,10 @@ export class RecordingsService {
       .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running', 'cancelled'])))
       .returning();
     if (!job) return;
+    this.metrics.jobsFinished.add(1, { status: 'done' });
+    const wallSeconds = (job.finishedAt!.getTime() - (job.startedAt ?? job.createdAt).getTime()) / 1000;
+    if (wallSeconds > 0 && result.audioSeconds > 0)
+      this.metrics.realtimeFactor.record(result.audioSeconds / wallSeconds);
     await this.setRecordingStatus(job.recordingId, 'done', {
       latestTranscriptId: result.transcriptId,
       detectedLanguage: result.detectedLanguage,
@@ -502,6 +623,7 @@ export class RecordingsService {
       .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running'])))
       .returning();
     if (!job) return;
+    this.metrics.jobsFinished.add(1, { status });
     const [recording] = await this.db.select().from(recordings).where(eq(recordings.id, job.recordingId));
     if (recording && (recording.status === 'queued' || recording.status === 'transcribing')) {
       // Back to where it was: a transcript from an earlier job still counts.

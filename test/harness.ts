@@ -107,6 +107,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     SEARCH_GRPC_ADDR: servers[3]!.address,
     CONSUMER_GROUP: schema,
     SMTP_URL: 'memory:',
+    JOB_SWEEP_SECONDS: 0, // tests call sweepJobs() themselves
     BOOTSTRAP_ADMIN_EMAIL: 'admin@example.test',
     BOOTSTRAP_ADMIN_PASSWORD: 'admin-password-1',
     BOOTSTRAP_ADMIN_NAME: 'Admin',

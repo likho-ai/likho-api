@@ -8,6 +8,7 @@ import {
   boolean,
   doublePrecision,
   index,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -223,14 +224,19 @@ export const jobs = pgTable(
     errorCode: text('error_code').notNull().default(''),
     errorMessage: text('error_message').notNull().default(''),
     transcriptId: text('transcript_id').notNull().default(''),
+    /** 1 for the first try; the sweeper tries a stuck or stalled job once more. */
+    attempt: integer().notNull().default(1),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: now(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    /** The last time anything happened to the job: queued, asked for again, started, a line. */
+    lastProgressAt: timestamp('last_progress_at', { withTimezone: true }),
   },
   (table) => [
     index('jobs_recording').on(table.recordingId, table.createdAt),
     index('jobs_workspace_status').on(table.workspaceId, table.status),
+    index('jobs_status_progress').on(table.status, table.lastProgressAt),
   ],
 );
 

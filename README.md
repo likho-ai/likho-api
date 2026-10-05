@@ -66,6 +66,13 @@ What you can rely on:
   the lines so far first.
 - **Auto-transcribe** (a workspace setting, on by default) queues a job the moment a recording is
   ready.
+- **No job waits forever.** A job still queued after `JOB_QUEUED_MAX_MINUTES` is asked for again
+  once, then failed as `no_worker`; a running job with no line for `JOB_STALL_MAX_MINUTES` is
+  stopped, failed as `stalled`, and tried once more (`attempt` 2). The service also keeps trying
+  to reach NATS at start instead of exiting.
+- **Metrics** at `GET /metrics` (Prometheus text, OpenTelemetry): jobs by status, the age of the
+  oldest waiting job, jobs finished by outcome, the realtime factor of transcription, events
+  handled, sweeps. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to push them to Grafana as well.
 
 ## Run it
 
@@ -176,8 +183,14 @@ ConfigMaps and Secrets.
 | `SMTP_URL` | empty | Where invitation and reset mails go out: `smtp://user:pass@host:587` or `smtps://...:465`. Empty = no mail; admins pass invitation links on by hand, and password resets need an admin |
 | `MAIL_FROM` | `Likho <likho@localhost>` | The sender of those mails |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_WORKSPACE_NAME` | unset | The first admin and workspace, made when there are no users |
-| `CONSUMERS_ENABLED` | `true` | Take events from the bus |
+| `CONSUMERS_ENABLED` | `true` | Take events from the bus (and sweep jobs) |
 | `CONSUMER_GROUP` | `likho-api` | Instances with the same name share the events |
+| `NATS_CONNECT_TIMEOUT_SECONDS` | `120` | How long to keep trying to reach NATS at start |
+| `JOB_SWEEP_SECONDS` | `60` | How often stuck and stalled jobs are looked for; 0 = never |
+| `JOB_QUEUED_MAX_MINUTES` | `15` | A job still queued after this is asked for again, then failed (`no_worker`) |
+| `JOB_STALL_MAX_MINUTES` | `10` | A running job with no line for this long is stopped, failed (`stalled`) and tried once more |
+| `JOB_MAX_ATTEMPTS` | `2` | Tries a job gets in all |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Also push the metrics there (OTLP/HTTP, e.g. `http://localhost:4318`); `/metrics` is always on |
 
 ## Develop
 

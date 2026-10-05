@@ -16,7 +16,9 @@ import { ImportsResolver } from './imports/imports.resolver.js';
 import { ImportsService } from './imports/imports.service.js';
 import { LiveController } from './live/live.controller.js';
 import { LiveModule } from './live/live.module.js';
+import { MetricsModule } from './metrics/metrics.module.js';
 import { EventsConsumer } from './recordings/events.consumer.js';
+import { JobsSweeper } from './recordings/jobs.sweeper.js';
 import { JobsResolver, RecordingsResolver } from './recordings/recordings.resolver.js';
 import { RecordingsService } from './recordings/recordings.service.js';
 import {
@@ -52,6 +54,7 @@ export function appModule(config?: Config) {
   @Module({
     imports: [
       ConfigModule.forRoot(config),
+      MetricsModule,
       DbModule,
       BusModule,
       LiveModule,
@@ -86,6 +89,7 @@ export function appModule(config?: Config) {
       ImportsService,
       SearchService,
       EventsConsumer,
+      JobsSweeper,
       RecordingsResolver,
       JobsResolver,
       SearchResolver,

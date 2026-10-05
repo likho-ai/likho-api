@@ -188,6 +188,8 @@ input InviteUserInput {
 }
 
 type Job {
+  """1 for the first try; a stuck or stalled job is tried once more."""
+  attempt: Int!
   createdAt: DateTime!
   errorCode: String!
   errorMessage: String!
@@ -195,6 +197,9 @@ type Job {
   force: Boolean!
   id: String!
   languagePolicy: String!
+
+  """When anything last happened to the job."""
+  lastProgressAt: DateTime
   modelRegistryId: String!
   progressSeconds: Float!
   recordingId: String!

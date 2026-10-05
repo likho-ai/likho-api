@@ -54,6 +54,20 @@ const schema = z.object({
     .transform((v) => v === 'true'),
   /** A durable consumer name per instance group; instances with the same name share the work. */
   CONSUMER_GROUP: z.string().default('likho-api'),
+  /** How long to keep trying to reach NATS at start before giving up. */
+  NATS_CONNECT_TIMEOUT_SECONDS: seconds.default(120),
+
+  /** The job sweeper (with the consumers): how often it looks, 0 = never. */
+  JOB_SWEEP_SECONDS: z.coerce.number().int().min(0).default(60),
+  /** A job still queued after this long is asked for again, then failed. */
+  JOB_QUEUED_MAX_MINUTES: seconds.default(15),
+  /** A running job with no line for this long is failed and tried once more. */
+  JOB_STALL_MAX_MINUTES: seconds.default(10),
+  /** How many tries a job gets in all. */
+  JOB_MAX_ATTEMPTS: seconds.default(2),
+
+  /** Metrics are always at /metrics (Prometheus text); set this to also push them (OTLP/HTTP). */
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
 });
 
 export type Config = z.infer<typeof schema>;

@@ -27,9 +27,13 @@ export class Job {
   @Field() errorCode: string;
   @Field() errorMessage: string;
   @Field() transcriptId: string;
+  @Field(() => Int, { description: '1 for the first try; a stuck or stalled job is tried once more.' })
+  attempt: number;
   @Field() createdAt: Date;
   @Field(() => Date, { nullable: true }) startedAt: Date | null;
   @Field(() => Date, { nullable: true }) finishedAt: Date | null;
+  @Field(() => Date, { nullable: true, description: 'When anything last happened to the job.' })
+  lastProgressAt: Date | null;
 }
 
 @ObjectType({ description: 'A fact about the call from where it came: campaign, agent, disposition, ...' })

@@ -664,6 +664,20 @@
           "Live"
         ]
       }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "MetricsController_scrape",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Metrics"
+        ]
+      }
     }
   },
   "info": {

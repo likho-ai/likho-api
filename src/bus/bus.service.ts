@@ -14,6 +14,7 @@ import {
 } from 'nats';
 import { newId } from '../common/ids.js';
 import { CONFIG, type Config } from '../config/config.js';
+import { MetricsService } from '../metrics/metrics.service.js';
 
 export const SOURCE = 'likho-api';
 const codec = StringCodec();
@@ -61,24 +62,51 @@ export class BusService implements OnModuleInit, OnModuleDestroy {
   private manager: JetStreamManager | null = null;
   private readonly consumers: Consumer[] = [];
 
-  constructor(@Inject(CONFIG) private readonly config: Config) {}
+  constructor(
+    @Inject(CONFIG) private readonly config: Config,
+    private readonly metrics: MetricsService,
+  ) {}
 
+  /**
+   * Connects, trying again while NATS is not there yet (it may be starting at the same time),
+   * for NATS_CONNECT_TIMEOUT_SECONDS; once connected, the client reconnects on its own.
+   */
   async onModuleInit(): Promise<void> {
+    const deadline = Date.now() + this.config.NATS_CONNECT_TIMEOUT_SECONDS * 1000;
+    let wait = 1000;
+    for (;;) {
+      try {
+        await this.open();
+        this.log.log(`connected to ${this.config.NATS_URL}`);
+        return;
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        await this.connection?.close().catch(() => undefined);
+        this.connection = null;
+        if (Date.now() + wait > deadline) {
+          throw new Error(`the event bus at ${this.config.NATS_URL} did not answer in time: ${reason}`);
+        }
+        this.log.warn(`event bus not ready (${reason}); trying again in ${wait / 1000} s`);
+        await new Promise((resolve) => setTimeout(resolve, wait));
+        wait = Math.min(wait * 2, 10_000);
+      }
+    }
+  }
+
+  private async open(): Promise<void> {
     this.connection = await connect({
       servers: this.config.NATS_URL,
       name: SOURCE,
       maxReconnectAttempts: -1,
+      timeout: 5_000,
     });
     this.jetstream = this.connection.jetstream();
     this.manager = await this.connection.jetstreamManager();
     try {
       await this.manager.streams.info('LIKHO');
     } catch {
-      throw new Error(
-        `stream LIKHO does not exist on ${this.config.NATS_URL}; create the streams first (likho-infra: scripts/up.sh)`,
-      );
+      throw new Error(`stream LIKHO does not exist; create the streams first (likho-infra: scripts/up.sh)`);
     }
-    this.log.log(`connected to ${this.config.NATS_URL}`);
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -143,18 +171,22 @@ export class BusService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.log.error(`dropping a message on ${message.subject} that is not an event: ${String(error)}`);
       message.term();
+      this.metrics.eventsHandled.add(1, { subject: message.subject, outcome: 'dropped' });
       return;
     }
     try {
       await handler(parsed, message);
       message.ack();
+      this.metrics.eventsHandled.add(1, { subject: message.subject, outcome: 'ok' });
     } catch (error) {
       const attempt = message.info.redeliveryCount;
       this.log.warn(`${parsed.type} ${parsed.id} attempt ${attempt} failed: ${String(error)}`);
       if (attempt >= 5) {
         message.term();
+        this.metrics.eventsHandled.add(1, { subject: message.subject, outcome: 'dropped' });
       } else {
         message.nak(Math.min(attempt, 5) * 5_000);
+        this.metrics.eventsHandled.add(1, { subject: message.subject, outcome: 'retry' });
       }
     }
   }
