@@ -1,13 +1,18 @@
 import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { CurrentUser } from '../auth/auth.guard.js';
+import { AuditService } from '../audit/audit.service.js';
+import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Import, ImportPage, ImportStatusEnum, RequestImportInput } from './imports.graphql.js';
 import { ImportsService } from './imports.service.js';
 
 @Resolver(() => Import)
 export class ImportsResolver {
-  constructor(private readonly service: ImportsService) {}
+  constructor(
+    private readonly service: ImportsService,
+    private readonly audit: AuditService,
+  ) {}
 
+  @MinRole('member')
   @Mutation(() => Import, {
     description: 'Asks the dialer connector for a call by its id; the recording appears when it arrives.',
   })
@@ -15,7 +20,17 @@ export class ImportsResolver {
     @CurrentUser() me: Principal,
     @Args('input') input: RequestImportInput,
   ): Promise<Import> {
-    return this.service.request(me.workspaceId, me.userId, input);
+    const row = await this.service.request(me.workspaceId, me.userId, input);
+    await this.audit.record(
+      me,
+      'import.requested',
+      { kind: 'import', id: row.id },
+      {
+        source: row.source,
+        externalId: row.externalId,
+      },
+    );
+    return row;
   }
 
   @Query(() => ImportPage, { description: 'Calls asked for from the dialer, newest first.' })

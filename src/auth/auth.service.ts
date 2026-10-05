@@ -17,18 +17,25 @@ import { hashPassword, verifyPassword } from './passwords.js';
 export const SESSION_COOKIE = 'likho_session';
 const API_KEY_PREFIX = 'lk_';
 
+/** What a person may do: an admin manages people and settings, a member works with recordings, a viewer reads. */
+export const ROLES = ['admin', 'member', 'viewer'] as const;
+export type Role = (typeof ROLES)[number];
+export const isRole = (value: unknown): value is Role => ROLES.includes(value as Role);
+
 /** The person (or key) behind a request. */
 export interface Principal {
   kind: 'user' | 'api_key';
   userId: string | null;
   email: string;
   name: string;
-  role: 'admin' | 'member';
+  role: Role;
   /** The workspace the request works in. */
   workspaceId: string;
   workspaceRole: 'owner' | 'member';
   sessionId?: string;
   apiKeyId?: string;
+  /** Where the request came from, for the audit log. */
+  ip?: string;
 }
 
 export interface UserRow {
@@ -75,12 +82,7 @@ export class AuthService implements OnModuleInit {
 
   // ---------------------------------------------------------------- users and workspaces
 
-  async createUser(input: {
-    email: string;
-    name: string;
-    password: string;
-    role?: 'admin' | 'member';
-  }): Promise<UserRow> {
+  async createUser(input: { email: string; name: string; password: string; role?: Role }): Promise<UserRow> {
     const email = input.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw invalid('That is not an email address.');
     if (input.password.length < 8) throw invalid('The password must be at least 8 characters.');
@@ -139,6 +141,14 @@ export class AuthService implements OnModuleInit {
     await this.db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, sessionId));
   }
 
+  /** Ends every session of a person: after a disabling or a password reset. */
+  async endSessionsOf(userId: string): Promise<void> {
+    await this.db
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+  }
+
   /** The principal behind a session cookie, or null. */
   async fromSession(token: string): Promise<Principal | null> {
     const id = this.hashToken(token);
@@ -162,7 +172,7 @@ export class AuthService implements OnModuleInit {
       userId: row.user.id,
       email: row.user.email,
       name: row.user.name,
-      role: row.user.role as 'admin' | 'member',
+      role: isRole(row.user.role) ? row.user.role : 'viewer',
       workspaceId: membership.workspaceId,
       workspaceRole: membership.role as 'owner' | 'member',
       sessionId: id,

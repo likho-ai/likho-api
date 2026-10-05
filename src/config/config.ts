@@ -33,6 +33,14 @@ const schema = z.object({
   SESSION_SECRET: z.string().min(16).default(DEV_SESSION_SECRET),
   SESSION_DAYS: seconds.default(30),
 
+  /**
+   * Where invitation and password-reset mails go out: smtp://user:pass@host:587 (STARTTLS) or
+   * smtps://user:pass@host:465. Empty = no mail; an admin passes invitation links on by hand.
+   * 'memory:' keeps the mails in the process, for tests.
+   */
+  SMTP_URL: z.string().default(''),
+  MAIL_FROM: z.string().default('Likho <likho@localhost>'),
+
   /** Created on first start when there are no users at all. */
   BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().min(8).optional(),

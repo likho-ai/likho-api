@@ -16,7 +16,8 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { CurrentUser } from '../auth/auth.guard.js';
+import { AuditService } from '../audit/audit.service.js';
+import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Clients, fromRpc } from '../clients/clients.module.js';
 import { invalid } from '../common/errors.js';
@@ -186,9 +187,11 @@ export class RecordingsController {
   constructor(
     private readonly recordings: RecordingsService,
     private readonly clients: Clients,
+    private readonly audit: AuditService,
   ) {}
 
   @Post()
+  @MinRole('member')
   @ApiOperation({
     summary: 'Start an upload',
     description: 'Makes the recording and returns the link to PUT the file to.',
@@ -199,6 +202,17 @@ export class RecordingsController {
       ...rest,
       source: me.kind === 'api_key' ? source || 'api' : 'upload',
     });
+    if (!answer.duplicateOf) {
+      await this.audit.record(
+        me,
+        'recording.created',
+        { kind: 'recording', id: answer.recording.id },
+        {
+          originalName: answer.recording.originalName,
+          source: answer.recording.source,
+        },
+      );
+    }
     return {
       recording: recordingJson(answer.recording),
       uploadUrl: answer.uploadUrl,
@@ -230,9 +244,17 @@ export class RecordingsController {
   }
 
   @Delete(':id')
+  @MinRole('member')
   @ApiOperation({ summary: 'Delete a recording, its audio and its jobs' })
   async delete(@CurrentUser() me: Principal, @Param('id') id: string) {
+    const recording = await this.recordings.get(me.workspaceId, id);
     await this.recordings.delete(me.workspaceId, id);
+    await this.audit.record(
+      me,
+      'recording.deleted',
+      { kind: 'recording', id },
+      { originalName: recording.originalName },
+    );
     return { deleted: true };
   }
 
@@ -260,6 +282,7 @@ export class RecordingsController {
   }
 
   @Post(':id/transcript/corrections')
+  @MinRole('member')
   @ApiOperation({
     summary: 'Correct one line',
     description:
@@ -271,8 +294,9 @@ export class RecordingsController {
       throw invalid('Correct the latest version of the transcript.');
     const text = body.text.trim();
     if (!text) throw invalid('The corrected line is empty.');
+    let reply;
     try {
-      const reply = await this.clients.transcription.correctSegment({
+      reply = await this.clients.transcription.correctSegment({
         transcriptId: body.transcriptId,
         segmentIndex: body.segmentIndex,
         layer: layerToPb(body.layer),
@@ -280,12 +304,23 @@ export class RecordingsController {
         userId: me.userId ?? '',
         workspaceId: me.workspaceId,
       });
-      const corrected = transcriptFromPb(reply.transcript!);
-      await this.recordings.setRecordingStatus(id, 'done', { latestTranscriptId: corrected.id });
-      return { transcript: corrected, correction: correctionFromPb(reply.correction!) };
     } catch (error) {
       throw fromRpc(error, 'transcription');
     }
+    const corrected = transcriptFromPb(reply.transcript!);
+    await this.recordings.setRecordingStatus(id, 'done', { latestTranscriptId: corrected.id });
+    await this.audit.record(
+      me,
+      'transcript.corrected',
+      { kind: 'recording', id },
+      {
+        from: body.transcriptId,
+        to: corrected.id,
+        segmentIndex: body.segmentIndex,
+        layer: body.layer,
+      },
+    );
+    return { transcript: corrected, correction: correctionFromPb(reply.correction!) };
   }
 
   @Get(':id/transcript/corrections')
@@ -301,9 +336,21 @@ export class RecordingsController {
   }
 
   @Post(':id/jobs')
+  @MinRole('member')
   @ApiOperation({ summary: 'Queue a transcription' })
   async createJob(@CurrentUser() me: Principal, @Param('id') id: string, @Body() body: CreateJobDto) {
-    return jobJson(await this.recordings.createJob(me.workspaceId, me.userId, id, body));
+    const job = await this.recordings.createJob(me.workspaceId, me.userId, id, body);
+    await this.audit.record(
+      me,
+      'job.created',
+      { kind: 'job', id: job.id },
+      {
+        recordingId: id,
+        languagePolicy: job.languagePolicy,
+        force: job.force,
+      },
+    );
+    return jobJson(job);
   }
 
   @Get(':id/jobs')
@@ -318,7 +365,10 @@ export class RecordingsController {
 @ApiBearerAuth()
 @Controller('api/v1/jobs')
 export class JobsController {
-  constructor(private readonly recordings: RecordingsService) {}
+  constructor(
+    private readonly recordings: RecordingsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get(':id')
   @ApiOperation({ summary: 'One job' })
@@ -327,9 +377,12 @@ export class JobsController {
   }
 
   @Post(':id/cancel')
+  @MinRole('member')
   @ApiOperation({ summary: 'Stop a waiting or running job' })
   async cancel(@CurrentUser() me: Principal, @Param('id') id: string) {
-    return jobJson(await this.recordings.cancelJob(me.workspaceId, id));
+    const job = await this.recordings.cancelJob(me.workspaceId, id);
+    await this.audit.record(me, 'job.cancelled', { kind: 'job', id }, { recordingId: job.recordingId });
+    return jobJson(job);
   }
 }
 
@@ -372,15 +425,29 @@ export class SearchController {
 @ApiBearerAuth()
 @Controller('api/v1/imports')
 export class ImportsController {
-  constructor(private readonly imports: ImportsService) {}
+  constructor(
+    private readonly imports: ImportsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Post()
+  @MinRole('member')
   @ApiOperation({
     summary: 'Fetch a call from the dialer by its id',
     description: 'The connector fetches the call; poll the import, or the recordings, to see it arrive.',
   })
   async request(@CurrentUser() me: Principal, @Body() body: RequestImportDto) {
-    return importJson(await this.imports.request(me.workspaceId, me.userId, body));
+    const row = await this.imports.request(me.workspaceId, me.userId, body);
+    await this.audit.record(
+      me,
+      'import.requested',
+      { kind: 'import', id: row.id },
+      {
+        source: row.source,
+        externalId: row.externalId,
+      },
+    );
+    return importJson(row);
   }
 
   @Get()

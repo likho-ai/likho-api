@@ -567,6 +567,204 @@ describe.skipIf(!stackUp)('likho-api', () => {
     });
   });
 
+  describe('people and roles', () => {
+    let inviteLink = '';
+    let viewerId = '';
+
+    it('an admin invites a viewer; the link goes by mail and comes back to the admin', async () => {
+      const { inviteUser } = await admin.ok(
+        `mutation { inviteUser(input: { email: "Viewer@example.test", name: "Vee", role: viewer }) { invitation { id email name role acceptedAt } link sent } }`,
+      );
+      expect(inviteUser.invitation).toMatchObject({
+        email: 'viewer@example.test',
+        name: 'Vee',
+        role: 'viewer',
+        acceptedAt: null,
+      });
+      expect(inviteUser.sent).toBe(true);
+      expect(inviteUser.link).toMatch(/^http:\/\/localhost:8080\/invite\/[A-Za-z0-9_-]{40,}$/);
+      const mail = h.mail.outbox.at(-1)!;
+      expect(mail.to).toBe('viewer@example.test');
+      expect(mail.subject).toContain('Test workspace');
+      expect(mail.text).toContain(inviteUser.link);
+      inviteLink = inviteUser.link;
+
+      const { invitations } = await admin.ok(`{ invitations { email role acceptedAt revokedAt } }`);
+      expect(invitations).toContainEqual({
+        email: 'viewer@example.test',
+        role: 'viewer',
+        acceptedAt: null,
+        revokedAt: null,
+      });
+      expect(
+        await admin.fails(`mutation { inviteUser(input: { email: "not-an-email", role: member }) { sent } }`),
+      ).toBe('invalid');
+      expect(
+        await admin.fails(
+          `mutation { inviteUser(input: { email: "admin@example.test", role: member }) { sent } }`,
+        ),
+      ).toBe('conflict');
+    });
+
+    it('the invited person signs in through the link, and a viewer can only read', async () => {
+      const token = inviteLink.split('/').pop()!;
+      const browser = new Browser(h.url);
+      const { invitation } = await browser.ok(
+        `query ($token: String!) { invitation(token: $token) { email name role workspace } }`,
+        { token },
+      );
+      expect(invitation).toEqual({
+        email: 'viewer@example.test',
+        name: 'Vee',
+        role: 'viewer',
+        workspace: 'Test workspace',
+      });
+      const { acceptInvitation } = await browser.ok(
+        `mutation ($token: String!) { acceptInvitation(token: $token, name: "Vee Viewer", password: "viewer-password-1") { id email name role workspace { name } } }`,
+        { token },
+      );
+      expect(acceptInvitation).toMatchObject({
+        email: 'viewer@example.test',
+        name: 'Vee Viewer',
+        role: 'viewer',
+        workspace: { name: 'Test workspace' },
+      });
+      expect(browser.cookie).toContain('likho_session=');
+      viewerId = acceptInvitation.id;
+      // The link is used up.
+      expect(
+        await new Browser(h.url).fails(`query ($token: String!) { invitation(token: $token) { email } }`, {
+          token,
+        }),
+      ).toBe('not_found');
+
+      const { recordings } = await browser.ok(`{ recordings(first: 1) { items { id } } }`);
+      expect(recordings.items).toHaveLength(1);
+      const id = recordings.items[0].id;
+      expect(await browser.fails(`mutation ($id: String!) { deleteRecording(id: $id) }`, { id })).toBe(
+        'forbidden',
+      );
+      expect(
+        await browser.fails(
+          `mutation { requestUpload(input: { originalName: "x.mp3", sizeBytes: 1 }) { uploadUrl } }`,
+        ),
+      ).toBe('forbidden');
+      expect(
+        await browser.fails(`mutation ($id: String!) { createJob(input: { recordingId: $id }) { id } }`, {
+          id,
+        }),
+      ).toBe('forbidden');
+      expect(
+        await browser.fails(`mutation { upsertSpelling(input: { source: "a", target: "b" }) { id } }`),
+      ).toBe('forbidden');
+      expect(await browser.fails(`mutation { requestImport(input: { externalId: "d000-1" }) { id } }`)).toBe(
+        'forbidden',
+      );
+      expect(await browser.fails(`{ users { id } }`)).toBe('forbidden');
+      expect(await browser.fails(`{ auditLog { items { id } } }`)).toBe('forbidden');
+      const { users } = await admin.ok(`{ users { email role disabledAt } }`);
+      expect(users).toContainEqual({ email: 'viewer@example.test', role: 'viewer', disabledAt: null });
+    });
+
+    it('a role change takes effect at once; an admin keeps their own role', async () => {
+      const browser = new Browser(h.url);
+      await browser.login('viewer@example.test', 'viewer-password-1');
+      const { setUserRole } = await admin.ok(
+        `mutation ($id: String!) { setUserRole(userId: $id, role: member) { role } }`,
+        { id: viewerId },
+      );
+      expect(setUserRole.role).toBe('member');
+      const { requestUpload } = await browser.ok(
+        `mutation { requestUpload(input: { originalName: "by-member.mp3", sizeBytes: 1 }) { recording { id } } }`,
+      );
+      expect(requestUpload.recording.id).toMatch(/^rec_/);
+      expect(await browser.fails(`{ users { id } }`)).toBe('forbidden');
+
+      const { me } = await admin.ok(`{ me { id } }`);
+      expect(
+        await admin.fails(`mutation ($id: String!) { setUserRole(userId: $id, role: member) { role } }`, {
+          id: me.id,
+        }),
+      ).toBe('invalid');
+      expect(
+        await admin.fails(`mutation ($id: String!) { disableUser(userId: $id) { id } }`, { id: me.id }),
+      ).toBe('invalid');
+    });
+
+    it('a disabled person is signed out and cannot sign in until enabled again', async () => {
+      const browser = new Browser(h.url);
+      await browser.login('viewer@example.test', 'viewer-password-1');
+      const { disableUser } = await admin.ok(
+        `mutation ($id: String!) { disableUser(userId: $id) { disabledAt } }`,
+        { id: viewerId },
+      );
+      expect(disableUser.disabledAt).not.toBeNull();
+      expect(await browser.fails(`{ me { email } }`)).toBe('unauthenticated');
+      expect(
+        await new Browser(h.url).fails(
+          `mutation { login(email: "viewer@example.test", password: "viewer-password-1") { id } }`,
+        ),
+      ).toBe('unauthenticated');
+      await admin.ok(`mutation ($id: String!) { enableUser(userId: $id) { disabledAt } }`, { id: viewerId });
+      await new Browser(h.url).login('viewer@example.test', 'viewer-password-1');
+    });
+
+    it('a password change needs the current one; a reset link comes by mail and works once', async () => {
+      const browser = new Browser(h.url);
+      await browser.login('viewer@example.test', 'viewer-password-1');
+      expect(
+        await browser.fails(
+          `mutation { changePassword(currentPassword: "wrong-wrong-1", newPassword: "viewer-password-2") }`,
+        ),
+      ).toBe('invalid');
+      await browser.ok(
+        `mutation { changePassword(currentPassword: "viewer-password-1", newPassword: "viewer-password-2") }`,
+      );
+      await new Browser(h.url).login('viewer@example.test', 'viewer-password-2');
+
+      const before = h.mail.outbox.length;
+      const anonymous = new Browser(h.url);
+      const unknown = await anonymous.ok(`mutation { requestPasswordReset(email: "nobody@example.test") }`);
+      expect(unknown.requestPasswordReset).toBe(true);
+      expect(h.mail.outbox.length).toBe(before); // an unknown address: the same answer, no mail
+      await anonymous.ok(`mutation { requestPasswordReset(email: "viewer@example.test") }`);
+      const mail = h.mail.outbox.at(-1)!;
+      expect(mail.to).toBe('viewer@example.test');
+      const token = /\/reset\/([A-Za-z0-9_-]+)/.exec(mail.text)![1]!;
+      const { resetPassword } = await anonymous.ok(
+        `mutation ($token: String!) { resetPassword(token: $token, password: "viewer-password-3") { email } }`,
+        { token },
+      );
+      expect(resetPassword.email).toBe('viewer@example.test');
+      expect(await browser.fails(`{ me { email } }`)).toBe('unauthenticated'); // every other session ended
+      expect(
+        await new Browser(h.url).fails(
+          `mutation ($token: String!) { resetPassword(token: $token, password: "viewer-password-4") { email } }`,
+          { token },
+        ),
+      ).toBe('not_found');
+      await new Browser(h.url).login('viewer@example.test', 'viewer-password-3');
+    });
+
+    it('a revoked invitation is no good', async () => {
+      const { inviteUser } = await admin.ok(
+        `mutation { inviteUser(input: { email: "later@example.test", role: member }) { invitation { id } link } }`,
+      );
+      await admin.ok(`mutation ($id: String!) { revokeInvitation(id: $id) }`, {
+        id: inviteUser.invitation.id,
+      });
+      const token = inviteUser.link.split('/').pop()!;
+      expect(
+        await new Browser(h.url).fails(
+          `mutation ($token: String!) { acceptInvitation(token: $token, name: "L", password: "later-password-1") { id } }`,
+          { token },
+        ),
+      ).toBe('not_found');
+      const { invitations } = await admin.ok(`{ invitations { email revokedAt } }`);
+      expect(invitations.find((i: any) => i.email === 'later@example.test').revokedAt).not.toBeNull();
+    });
+  });
+
   describe('scripts with an API key', () => {
     let key: string;
 
@@ -699,6 +897,100 @@ describe.skipIf(!stackUp)('likho-api', () => {
       ).toBe('not_found');
       expect(await admin.fails(`mutation { upsertGlossaryTerm(input: { term: "  " }) { id } }`)).toBe(
         'invalid',
+      );
+    });
+  });
+
+  describe('the audit log', () => {
+    it('has every change, with who did it and to what', async () => {
+      const { auditLog } = await admin.ok(
+        `{ auditLog(first: 200) { items { id action actorKind actorId actorName targetKind targetId details ip createdAt } hasMore } }`,
+      );
+      expect(auditLog.hasMore).toBe(false);
+      const actions: string[] = auditLog.items.map((e: any) => e.action);
+      for (const action of [
+        'recording.created',
+        'recording.deleted',
+        'job.created',
+        'job.cancelled',
+        'transcript.retransliterated',
+        'transcript.corrected',
+        'import.requested',
+        'settings.updated',
+        'api_key.created',
+        'api_key.revoked',
+        'user.invited',
+        'invitation.accepted',
+        'invitation.revoked',
+        'user.role_changed',
+        'user.disabled',
+        'user.enabled',
+        'user.password_changed',
+        'user.password_reset',
+        'glossary.added',
+        'spelling.added',
+        'spelling.deleted',
+      ]) {
+        expect(actions, action).toContain(action);
+      }
+      // Newest first, and ids sort by time.
+      expect([...auditLog.items].sort((a: any, b: any) => (a.id < b.id ? 1 : -1))).toEqual(auditLog.items);
+
+      const invited = auditLog.items.find(
+        (e: any) => e.action === 'user.invited' && JSON.parse(e.details).email === 'viewer@example.test',
+      );
+      expect(invited).toMatchObject({ actorKind: 'user', actorName: 'Admin', targetKind: 'invitation' });
+      expect(invited.targetId).toMatch(/^inv_/);
+      expect(invited.ip).not.toBe('');
+      const roleChange = auditLog.items.find((e: any) => e.action === 'user.role_changed');
+      expect(JSON.parse(roleChange.details)).toEqual({
+        email: 'viewer@example.test',
+        from: 'viewer',
+        to: 'member',
+      });
+      const byScript = auditLog.items.filter(
+        (e: any) => e.action === 'recording.created' && e.actorKind === 'api_key',
+      );
+      expect(byScript.map((e: any) => e.actorName)).toEqual([
+        'API key "dialer connector"',
+        'API key "dialer connector"',
+      ]);
+      expect(byScript.map((e: any) => JSON.parse(e.details))).toEqual([
+        { originalName: 'd000-0a1b2c3d-vce-0007.mp3', source: 'ameyo' },
+        { originalName: 'from-script.mp3', source: 'api' },
+      ]);
+      const accepted = auditLog.items.find((e: any) => e.action === 'invitation.accepted');
+      expect(accepted.actorName).toBe('Vee Viewer'); // the new person, acting for themselves
+      expect(accepted.targetId).toBe(accepted.actorId);
+
+      // Filters and pages.
+      const { auditLog: disabled } = await admin.ok(
+        `{ auditLog(filter: { action: "user.disabled" }) { items { targetId } } }`,
+      );
+      expect(disabled.items).toEqual([{ targetId: accepted.actorId }]);
+      const { auditLog: ofPerson } = await admin.ok(
+        `query ($id: String!) { auditLog(filter: { targetKind: "user", targetId: $id }) { items { action } } }`,
+        { id: accepted.actorId },
+      );
+      expect(ofPerson.items.map((e: any) => e.action)).toEqual([
+        'user.password_reset',
+        'user.password_changed',
+        'user.enabled',
+        'user.disabled',
+        'user.role_changed',
+        'invitation.accepted',
+      ]);
+      const { auditLog: firstPage } = await admin.ok(
+        `{ auditLog(first: 2) { items { id } hasMore endCursor } }`,
+      );
+      expect(firstPage.items).toHaveLength(2);
+      expect(firstPage.hasMore).toBe(true);
+      const { auditLog: secondPage } = await admin.ok(
+        `query ($after: String!) { auditLog(first: 2, after: $after) { items { id } } }`,
+        { after: firstPage.endCursor },
+      );
+      expect(secondPage.items.map((e: any) => e.id)).toEqual(
+        auditLog.items.slice(2, 4).map((e: any) => e.id),
       );
     });
   });

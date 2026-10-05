@@ -1,6 +1,7 @@
 import { Args, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { AuditService } from '../audit/audit.service.js';
 import { Clients, fromRpc } from '../clients/clients.module.js';
-import { CurrentUser } from '../auth/auth.guard.js';
+import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Transcript, transcriptFromPb } from '../transcripts/transcripts.graphql.js';
 import {
@@ -23,6 +24,7 @@ export class RecordingsResolver {
   constructor(
     private readonly service: RecordingsService,
     private readonly clients: Clients,
+    private readonly audit: AuditService,
   ) {}
 
   @Query(() => RecordingPage, { description: 'The workspace’s recordings, newest first.' })
@@ -51,6 +53,7 @@ export class RecordingsResolver {
     return this.service.counts(me.workspaceId);
   }
 
+  @MinRole('member')
   @Mutation(() => UploadTicket, {
     description: 'Starts an upload: makes the recording and returns where to PUT the file.',
   })
@@ -59,17 +62,37 @@ export class RecordingsResolver {
     @Args('input') input: RequestUploadInput,
   ): Promise<UploadTicket> {
     const { attributes, source, ...rest } = input;
-    return this.service.requestUpload(me.workspaceId, me.userId, {
+    const ticket = await this.service.requestUpload(me.workspaceId, me.userId, {
       ...rest,
       // A person uploads; a script is 'api' unless it says which connector it is.
       source: me.kind === 'api_key' ? source?.trim() || 'api' : 'upload',
       attributes: Object.fromEntries((attributes ?? []).map((a) => [a.key, a.value])),
     });
+    if (!ticket.duplicateOf) {
+      await this.audit.record(
+        me,
+        'recording.created',
+        { kind: 'recording', id: ticket.recording.id },
+        {
+          originalName: ticket.recording.originalName,
+          source: ticket.recording.source,
+        },
+      );
+    }
+    return ticket;
   }
 
+  @MinRole('member')
   @Mutation(() => Boolean, { description: 'Removes the recording, its audio and its jobs.' })
   async deleteRecording(@CurrentUser() me: Principal, @Args('id') id: string): Promise<boolean> {
+    const recording = await this.service.get(me.workspaceId, id);
     await this.service.delete(me.workspaceId, id);
+    await this.audit.record(
+      me,
+      'recording.deleted',
+      { kind: 'recording', id },
+      { originalName: recording.originalName },
+    );
     return true;
   }
 
@@ -112,7 +135,10 @@ export class RecordingsResolver {
 
 @Resolver(() => Job)
 export class JobsResolver {
-  constructor(private readonly service: RecordingsService) {}
+  constructor(
+    private readonly service: RecordingsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Query(() => [Job], { description: 'Jobs of the workspace, newest first.' })
   async jobs(
@@ -128,13 +154,28 @@ export class JobsResolver {
     return this.service.getJob(me.workspaceId, id);
   }
 
+  @MinRole('member')
   @Mutation(() => Job, { description: 'Queues a transcription of a recording.' })
   async createJob(@CurrentUser() me: Principal, @Args('input') input: CreateJobInput): Promise<Job> {
-    return this.service.createJob(me.workspaceId, me.userId, input.recordingId, input);
+    const job = await this.service.createJob(me.workspaceId, me.userId, input.recordingId, input);
+    await this.audit.record(
+      me,
+      'job.created',
+      { kind: 'job', id: job.id },
+      {
+        recordingId: job.recordingId,
+        languagePolicy: job.languagePolicy,
+        force: job.force,
+      },
+    );
+    return job;
   }
 
+  @MinRole('member')
   @Mutation(() => Job, { description: 'Stops a waiting or running job.' })
   async cancelJob(@CurrentUser() me: Principal, @Args('id') id: string): Promise<Job> {
-    return this.service.cancelJob(me.workspaceId, id);
+    const job = await this.service.cancelJob(me.workspaceId, id);
+    await this.audit.record(me, 'job.cancelled', { kind: 'job', id }, { recordingId: job.recordingId });
+    return job;
   }
 }

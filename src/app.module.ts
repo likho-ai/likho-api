@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'node:path';
 import type { GraphQLFormattedError } from 'graphql';
+import { AuditResolver } from './audit/audit.resolver.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BusModule } from './bus/bus.module.js';
 import { ClientsModule } from './clients/clients.module.js';
@@ -28,6 +29,7 @@ import { SearchResolver } from './search/search.resolver.js';
 import { SearchService } from './search/search.service.js';
 import { SettingsResolver } from './settings/settings.resolver.js';
 import { TranscriptsResolver } from './transcripts/transcripts.resolver.js';
+import { UsersResolver } from './users/users.resolver.js';
 import { VocabularyResolver } from './vocabulary/vocabulary.resolver.js';
 
 /** GraphQL errors carry the same code as REST errors, in extensions.code. */
@@ -91,6 +93,8 @@ export function appModule(config?: Config) {
       TranscriptsResolver,
       VocabularyResolver,
       SettingsResolver,
+      UsersResolver,
+      AuditResolver,
     ],
   })
   class AppModule {}

@@ -1,6 +1,6 @@
 {
   "name": "likho-api",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Likho API: login, workspaces, recordings, jobs and live lines; GraphQL for the web apps, REST for scripts and connectors",
   "private": true,
   "type": "module",
@@ -41,6 +41,7 @@
     "graphql": "^16.11.0",
     "ioredis": "^6.0.0",
     "nats": "^2.29.3",
+    "nodemailer": "10.0.14",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
@@ -53,6 +54,7 @@
     "@swc/core": "^1.16.13",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "8.0.2",
     "@types/pg": "^8.15.6",
     "@types/supertest": "^7.0.0",
     "drizzle-kit": "^0.31.11",

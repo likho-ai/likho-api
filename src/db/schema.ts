@@ -23,11 +23,76 @@ export const users = pgTable('users', {
   email: text().notNull().unique(),
   name: text().notNull(),
   passwordHash: text('password_hash').notNull(),
-  /** 'admin' may manage users and settings; 'member' works with recordings. */
+  /** 'admin' manages people and settings; 'member' works with recordings; 'viewer' reads and searches. */
   role: text().notNull().default('member'),
   createdAt: now(),
   disabledAt: timestamp('disabled_at', { withTimezone: true }),
 });
+
+/** A one-time link that makes a person a user of the workspace; good for seven days. */
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    email: text().notNull(),
+    name: text().notNull().default(''),
+    role: text().notNull().default('member'),
+    /** A hash of the token in the link; the link itself goes to the person (and the admin). */
+    tokenHash: text('token_hash').notNull().unique(),
+    invitedBy: text('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: now(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [index('invitations_workspace_created').on(table.workspaceId, table.createdAt)],
+);
+
+/** A one-time link to choose a new password; good for two hours. */
+export const passwordResets = pgTable('password_resets', {
+  id: text().primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdAt: now(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+});
+
+/** Who changed what, when: every change a person or an API key makes. Never a secret in `details`. */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** 'user' or 'api_key'. */
+    actorKind: text('actor_kind').notNull().default('user'),
+    /** The user's id, or the API key's. */
+    actorId: text('actor_id').notNull().default(''),
+    actorName: text('actor_name').notNull().default(''),
+    /** What happened: 'recording.deleted', 'user.invited', ... */
+    action: text().notNull(),
+    /** What it happened to: a kind ('recording', 'user', ...) and an id. */
+    targetKind: text('target_kind').notNull().default(''),
+    targetId: text('target_id').notNull().default(''),
+    details: jsonb()
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    ip: text().notNull().default(''),
+    createdAt: now(),
+  },
+  (table) => [
+    index('audit_log_workspace_created').on(table.workspaceId, table.createdAt),
+    index('audit_log_target').on(table.workspaceId, table.targetKind, table.targetId),
+  ],
+);
 
 export const sessions = pgTable(
   'sessions',

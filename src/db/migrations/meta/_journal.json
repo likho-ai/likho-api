@@ -15,6 +15,13 @@
       "when": 1791026313284,
       "tag": "0001_search_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791178543846,
+      "tag": "0002_users_audit",
+      "breakpoints": true
     }
   ]
 }

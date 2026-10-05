@@ -46,7 +46,17 @@ A recording's life, as the API sees it:
 What you can rely on:
 
 - **Sign-in is a cookie**, `likho_session`, HttpOnly and SameSite=Lax. Sessions are rows: logging
-  out or revoking takes effect at once. Passwords are hashed with scrypt.
+  out, revoking or disabling a person takes effect at once. Passwords are hashed with scrypt.
+- **Three roles.** An `admin` manages people, keys and settings; a `member` works with
+  recordings (upload, transcribe, correct, vocabulary); a `viewer` reads, plays and searches.
+  A viewer's mutation is refused with `forbidden`. API keys act as members.
+- **People join by invitation**: an admin invites an email address with a role; the one-time
+  link (seven days) is mailed when `SMTP_URL` is set and is shown to the admin either way. The
+  person chooses a name and a password through the link. Password resets work the same way, by
+  mail only. Tokens are stored hashed.
+- **Every change is in the audit log** (`auditLog`, admins): who (person or API key), what
+  (`recording.deleted`, `user.invited`, `transcript.corrected`, ...), to what, from which address,
+  with the details that matter and never a secret.
 - **API keys** (`Authorization: Bearer lk_...`) are made by an admin on the settings page, shown
   once, stored hashed, and revocable.
 - **Workspaces keep people apart.** Every query is scoped to the caller's workspace; a recording
@@ -69,11 +79,13 @@ pnpm start:dev        # reads .env.development: the local stack, and a first adm
 ```
 
 The first start creates the admin and workspace named in `BOOTSTRAP_ADMIN_*` (in
-`.env.development`: `admin@example.com` / `admin-password-1`, for your machine only). More users:
+`.env.development`: `admin@example.com` / `admin-password-1`, for your machine only). Everyone
+else is invited by an admin from the admin app (or with the `inviteUser` mutation). From a shell,
+without a browser:
 
 ```bash
 pnpm build
-pnpm users:add --email a@example.com --name "A. Person" --password "..." [--admin]
+pnpm users:add --email a@example.com --name "A. Person" --password "..." [--role admin|member|viewer]
 ```
 
 Then, through the gateway at http://localhost:8080:
@@ -161,6 +173,8 @@ ConfigMaps and Secrets.
 | `PUBLIC_ORIGIN` | `http://localhost:8080` | The address browsers use; https makes cookies Secure |
 | `SESSION_SECRET` | a development value | Keys sessions and API keys; required in production |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts |
+| `SMTP_URL` | empty | Where invitation and reset mails go out: `smtp://user:pass@host:587` or `smtps://...:465`. Empty = no mail; admins pass invitation links on by hand, and password resets need an admin |
+| `MAIL_FROM` | `Likho <likho@localhost>` | The sender of those mails |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_WORKSPACE_NAME` | unset | The first admin and workspace, made when there are no users |
 | `CONSUMERS_ENABLED` | `true` | Take events from the bus |
 | `CONSUMER_GROUP` | `likho-api` | Instances with the same name share the events |

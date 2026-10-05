@@ -23,6 +23,38 @@ input AttributeInput {
   value: String!
 }
 
+"""One change: who did what to which thing."""
+type AuditEntry {
+  """What happened: 'recording.deleted', 'user.invited', ..."""
+  action: String!
+  actorId: String!
+
+  """'user' or 'api_key'."""
+  actorKind: String!
+  actorName: String!
+  createdAt: DateTime!
+
+  """What changed, as JSON text."""
+  details: String!
+  id: String!
+  ip: String!
+  targetId: String!
+  targetKind: String!
+}
+
+input AuditFilterInput {
+  action: String
+  actorId: String
+  targetId: String
+  targetKind: String
+}
+
+type AuditPage {
+  endCursor: String
+  hasMore: Boolean!
+  items: [AuditEntry!]!
+}
+
 input CorrectSegmentInput {
   layer: Layer!
   segmentIndex: Int!
@@ -129,6 +161,32 @@ enum ImportStatus {
   requested
 }
 
+type Invitation {
+  acceptedAt: DateTime
+  createdAt: DateTime!
+  email: String!
+  expiresAt: DateTime!
+  id: String!
+  invitedBy: String
+  name: String!
+  revokedAt: DateTime
+  role: Role!
+}
+
+"""What an invitation link is for, shown before it is accepted."""
+type InvitationPreview {
+  email: String!
+  name: String!
+  role: Role!
+  workspace: String!
+}
+
+input InviteUserInput {
+  email: String!
+  name: String
+  role: Role!
+}
+
 type Job {
   createdAt: DateTime!
   errorCode: String!
@@ -177,13 +235,23 @@ type Me {
   email: String!
   id: String
   name: String!
+
+  """admin, member or viewer."""
   role: String!
   workspace: Workspace!
 }
 
 type Mutation {
+  """
+  Takes up an invitation: the person chooses a name and a password and is signed in.
+  """
+  acceptInvitation(name: String!, password: String!, token: String!): Me!
+
   """Stops a waiting or running job."""
   cancelJob(id: String!): Job!
+
+  """Changes your own password; the current one is needed."""
+  changePassword(currentPassword: String!, newPassword: String!): Boolean!
 
   """
   Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.
@@ -201,6 +269,17 @@ type Mutation {
   deleteRecording(id: String!): Boolean!
   deleteSpelling(id: String!): Boolean!
 
+  """The person cannot sign in any more; their sessions end now."""
+  disableUser(userId: String!): User!
+
+  """The person can sign in again."""
+  enableUser(userId: String!): User!
+
+  """
+  Invites a person by email: a one-time link, good for seven days, mailed when mail is set up and returned to you either way.
+  """
+  inviteUser(input: InviteUserInput!): NewInvitation!
+
   """Signs in and sets the session cookie."""
   login(email: String!, password: String!): Me!
 
@@ -213,15 +292,31 @@ type Mutation {
   requestImport(input: RequestImportInput!): Import!
 
   """
+  Mails a link to choose a new password. Always answers true, so an address cannot be probed. Without mail set up, ask an admin.
+  """
+  requestPasswordReset(email: String!): Boolean!
+
+  """
   Starts an upload: makes the recording and returns where to PUT the file.
   """
   requestUpload(input: RequestUploadInput!): UploadTicket!
+
+  """Chooses a new password through a reset link, and signs in."""
+  resetPassword(password: String!, token: String!): Me!
 
   """
   A new version whose Hinglish is rebuilt with the current spellings. The speech model does not run.
   """
   retransliterate(transcriptId: String!): Transcript!
   revokeApiKey(id: String!): Boolean!
+
+  """Makes an invitation link useless."""
+  revokeInvitation(id: String!): Boolean!
+
+  """
+  Changes what a person may do. You cannot take your own admin role away.
+  """
+  setUserRole(role: Role!, userId: String!): User!
   updateSettings(autoTranscribe: Boolean!): Settings!
   upsertGlossaryTerm(input: GlossaryTermInput!): GlossaryTerm!
   upsertSpelling(input: SpellingInput!): Spelling!
@@ -234,8 +329,21 @@ type NewApiKey {
   key: String!
 }
 
+type NewInvitation {
+  invitation: Invitation!
+
+  """The link to pass on. It was also mailed when `sent` is true."""
+  link: String!
+
+  """Whether the link went out by mail (SMTP_URL is set)."""
+  sent: Boolean!
+}
+
 type Query {
   apiKeys: [ApiKey!]!
+
+  """Who changed what, newest first."""
+  auditLog(after: String, filter: AuditFilterInput, first: Int): AuditPage!
 
   """Every correction made to a recording’s transcripts, newest first."""
   corrections(recordingId: String!): [Correction!]!
@@ -247,6 +355,12 @@ type Query {
 
   """Calls asked for from the dialer, newest first."""
   imports(after: String, first: Int, status: [ImportStatus!]): ImportPage!
+
+  """What an invitation link is for, before it is accepted."""
+  invitation(token: String!): InvitationPreview!
+
+  """Invitations sent, newest first, accepted and revoked ones too."""
+  invitations: [Invitation!]!
   job(id: String!): Job!
 
   """Jobs of the workspace, newest first."""
@@ -276,6 +390,9 @@ type Query {
   Every version of a recording’s transcript, newest first, without lines.
   """
   transcriptVersions(recordingId: String!): [Transcript!]!
+
+  """The people of the workspace, newest first."""
+  users: [User!]!
 }
 
 type Recording {
@@ -371,6 +488,15 @@ input RequestUploadInput {
 
   """Where the call comes from (a connector’s name); API keys only."""
   source: String
+}
+
+"""
+admin manages people and settings; member works with recordings; viewer reads and searches.
+"""
+enum Role {
+  admin
+  member
+  viewer
 }
 
 input SearchFilter {
@@ -483,6 +609,17 @@ type UploadTicket {
 
   """PUT the file here. Empty when the same content is already stored."""
   uploadUrl: String!
+}
+
+type User {
+  createdAt: DateTime!
+
+  """Set while the person cannot sign in."""
+  disabledAt: DateTime
+  email: String!
+  id: String!
+  name: String!
+  role: Role!
 }
 
 type Workspace {

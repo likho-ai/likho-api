@@ -13,6 +13,7 @@ import pg from 'pg';
 import { createApp } from '../src/app.js';
 import { newId } from '../src/common/ids.js';
 import { Config, loadConfig } from '../src/config/config.js';
+import { MailService } from '../src/mail/mail.service.js';
 import { FakeLanguage, FakeMedia, FakeSearch, FakeServer, FakeTranscription, serve } from './fakes.js';
 
 const codec = StringCodec();
@@ -25,6 +26,8 @@ export interface Harness {
   transcription: FakeTranscription;
   language: FakeLanguage;
   search: FakeSearch;
+  /** The mails the service "sent" (SMTP_URL=memory:). */
+  mail: MailService;
   nats: NatsConnection;
   js: JetStreamClient;
   /** Publishes an event the way the other services do. Returns its id. */
@@ -103,6 +106,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     LANGUAGE_GRPC_ADDR: servers[2]!.address,
     SEARCH_GRPC_ADDR: servers[3]!.address,
     CONSUMER_GROUP: schema,
+    SMTP_URL: 'memory:',
     BOOTSTRAP_ADMIN_EMAIL: 'admin@example.test',
     BOOTSTRAP_ADMIN_PASSWORD: 'admin-password-1',
     BOOTSTRAP_ADMIN_NAME: 'Admin',
@@ -135,6 +139,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     transcription,
     language,
     search,
+    mail: app.get(MailService),
     nats,
     js,
     async publish(subject, type, data, id = newId('evt')) {

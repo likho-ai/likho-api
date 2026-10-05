@@ -1,5 +1,6 @@
 import { Args, Field, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
-import { CurrentUser } from '../auth/auth.guard.js';
+import { AuditService } from '../audit/audit.service.js';
+import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Clients, fromRpc } from '../clients/clients.module.js';
 import { forbidden, invalid } from '../common/errors.js';
@@ -26,6 +27,7 @@ export class TranscriptsResolver {
   constructor(
     private readonly clients: Clients,
     private readonly recordings: RecordingsService,
+    private readonly audit: AuditService,
   ) {}
 
   /** A transcript belongs to a recording; only the recording's workspace may read it. */
@@ -62,6 +64,7 @@ export class TranscriptsResolver {
     }
   }
 
+  @MinRole('member')
   @Mutation(() => Transcript, {
     description:
       'A new version whose Hinglish is rebuilt with the current spellings. The speech model does not run.',
@@ -72,18 +75,29 @@ export class TranscriptsResolver {
   ): Promise<Transcript> {
     const existing = await this.checked(me, transcriptId);
     if (me.kind === 'api_key') throw forbidden('An API key cannot change transcripts.');
+    let rebuilt: Transcript;
     try {
       const reply = await this.clients.transcription.retransliterate({ transcriptId });
-      const rebuilt = transcriptFromPb(reply.transcript!);
-      await this.recordings.setRecordingStatus(existing.recordingId, 'done', {
-        latestTranscriptId: rebuilt.id,
-      });
-      return rebuilt;
+      rebuilt = transcriptFromPb(reply.transcript!);
     } catch (error) {
       throw fromRpc(error, 'transcription');
     }
+    await this.recordings.setRecordingStatus(existing.recordingId, 'done', {
+      latestTranscriptId: rebuilt.id,
+    });
+    await this.audit.record(
+      me,
+      'transcript.retransliterated',
+      { kind: 'recording', id: existing.recordingId },
+      {
+        from: transcriptId,
+        to: rebuilt.id,
+      },
+    );
+    return rebuilt;
   }
 
+  @MinRole('member')
   @Mutation(() => Transcript, {
     description:
       'Replaces one line with what you wrote: a new version of the transcript, the correction kept. The Hinglish of a corrected script line is derived again.',
@@ -97,6 +111,7 @@ export class TranscriptsResolver {
     const text = input.text.trim();
     if (!text) throw invalid('The corrected line is empty.');
     if (text.length > 2000) throw invalid('The corrected line is too long.');
+    let corrected: Transcript;
     try {
       const reply = await this.clients.transcription.correctSegment({
         transcriptId: input.transcriptId,
@@ -106,14 +121,25 @@ export class TranscriptsResolver {
         userId: me.userId ?? '',
         workspaceId: me.workspaceId,
       });
-      const corrected = transcriptFromPb(reply.transcript!);
-      await this.recordings.setRecordingStatus(existing.recordingId, 'done', {
-        latestTranscriptId: corrected.id,
-      });
-      return corrected;
+      corrected = transcriptFromPb(reply.transcript!);
     } catch (error) {
       throw fromRpc(error, 'transcription');
     }
+    await this.recordings.setRecordingStatus(existing.recordingId, 'done', {
+      latestTranscriptId: corrected.id,
+    });
+    await this.audit.record(
+      me,
+      'transcript.corrected',
+      { kind: 'recording', id: existing.recordingId },
+      {
+        from: input.transcriptId,
+        to: corrected.id,
+        segmentIndex: input.segmentIndex,
+        layer: input.layer,
+      },
+    );
+    return corrected;
   }
 
   @Query(() => [Correction], {
