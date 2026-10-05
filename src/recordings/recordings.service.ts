@@ -547,10 +547,16 @@ export class RecordingsService {
     await this.setRecordingStatus(recording.id, 'failed', { failureReason: message });
   }
 
+  /** A worker took the job (the started event, or the first line). totalSeconds 0 = not known yet. */
   async onJobStarted(jobId: string, totalSeconds: number): Promise<void> {
     const [job] = await this.db
       .update(jobs)
-      .set({ status: 'running', startedAt: new Date(), lastProgressAt: new Date(), totalSeconds })
+      .set({
+        status: 'running',
+        startedAt: new Date(),
+        lastProgressAt: new Date(),
+        ...(totalSeconds > 0 ? { totalSeconds } : {}),
+      })
       .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued')))
       .returning();
     if (!job) return;
@@ -559,7 +565,7 @@ export class RecordingsService {
       kind: 'job',
       jobId,
       recordingId: job.recordingId,
-      data: { status: 'running', totalSeconds },
+      data: { status: 'running', totalSeconds: job.totalSeconds },
     });
   }
 

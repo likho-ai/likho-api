@@ -2,6 +2,7 @@
  * What the other services tell us, and what it means for a recording.
  *
  *   likho.media.ready / failed            the file is audio, or not
+ *   likho.transcription.started           a worker took the job
  *   likho.live.segment                    a line was transcribed (to the browsers, and progress)
  *   likho.transcription.completed/failed  a job ended
  *   likho.import.completed/failed         the connector fetched a call, or could not
@@ -53,6 +54,13 @@ export class EventsConsumer implements OnModuleInit {
       durable: 'media-failed',
       subject: 'likho.media.failed',
       handler: this.once((data) => this.recordings.onMediaFailed(data.media_id, String(data.message ?? ''))),
+    });
+    // A worker took the job: it is in hand (running) even before the first line is heard.
+    await this.bus.consume({
+      stream: 'LIKHO',
+      durable: 'transcription-started',
+      subject: 'likho.transcription.started',
+      handler: this.once((data) => this.recordings.onJobStarted(String(data.job_id), 0)),
     });
     await this.bus.consume({
       stream: 'LIKHO',

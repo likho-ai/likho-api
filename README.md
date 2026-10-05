@@ -68,7 +68,8 @@ What you can rely on:
   ready.
 - **No job waits forever.** A job still queued after `JOB_QUEUED_MAX_MINUTES` is asked for again
   once, then failed as `no_worker`; a running job with no line for `JOB_STALL_MAX_MINUTES` is
-  stopped, failed as `stalled`, and tried once more (`attempt` 2). The service also keeps trying
+  stopped, failed as `stalled`, and tried once more (`attempt` 2). A worker says at once that it took a job
+  (`likho.transcription.started`), so a job is running while the model loads. The service also keeps trying
   to reach NATS at start instead of exiting.
 - **Metrics** at `GET /metrics` (Prometheus text, OpenTelemetry): jobs by status, the age of the
   oldest waiting job, jobs finished by outcome, the realtime factor of transcription, events

@@ -622,6 +622,31 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(after.status).toBe('ready');
     });
 
+    it('a job a worker has taken is running, and is left alone while the model loads', async () => {
+      const recording = await readyRecording(admin, 'taken.mp3', 'ready');
+      const { createJob } = await admin.ok(
+        `mutation ($id: String!) { createJob(input: { recordingId: $id }) { id } }`,
+        { id: recording.id },
+      );
+      await age(createJob.id); // queued long ago...
+      await h.publish('likho.transcription.started', 'likho.transcription.started.v1', {
+        job_id: createJob.id,
+        recording_id: recording.id,
+        workspace_id: h.media.uploads.at(-1)!.workspaceId,
+        attempt: 1,
+      });
+      await until(async () => {
+        const { job } = await admin.ok(JOB, { id: createJob.id });
+        return job.status === 'running' ? job : null;
+      }, 'the job to be running');
+      // ...but a worker has it now: nothing for the sweeper to do.
+      expect(await sweep()).toEqual({ requeued: 0, failed: 0 });
+      const { recording: mid } = await admin.ok(GET_RECORDING, { id: recording.id });
+      expect(mid.status).toBe('transcribing');
+      expect(mid.jobs[0]).toMatchObject({ status: 'running', totalSeconds: 61.5 }); // the length stays known
+      await admin.ok(`mutation ($id: String!) { cancelJob(id: $id) { status } }`, { id: createJob.id });
+    });
+
     it('a job whose worker went quiet is stopped, failed and tried once more', async () => {
       const recording = await readyRecording(admin, 'stall.mp3', 'ready');
       const { createJob } = await admin.ok(
