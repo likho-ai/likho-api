@@ -4,7 +4,13 @@ import { GqlExecutionContext } from '@nestjs/graphql';
 import { parse as parseCookies } from 'cookie';
 import type { Request } from 'express';
 import { forbidden, unauthenticated } from '../common/errors.js';
-import { AuthService, type Principal, type Role, SESSION_COOKIE } from './auth.service.js';
+import {
+  AuthService,
+  EXCHANGED_TOKEN_PREFIX,
+  type Principal,
+  type Role,
+  SESSION_COOKIE,
+} from './auth.service.js';
 
 export const IS_PUBLIC = 'likho:public';
 /** Marks a route or field that needs no sign-in (login, health). */
@@ -67,7 +73,11 @@ export class AuthGuard implements CanActivate {
   private async identify(request: Request): Promise<Principal | null> {
     const authorization = request.headers.authorization ?? '';
     if (authorization.startsWith('Bearer ')) {
-      return this.auth.fromApiKey(authorization.slice('Bearer '.length).trim());
+      const bearer = authorization.slice('Bearer '.length).trim();
+      // lk_ is an API key (a script, a connector); lt_ a token one exchanged itself for (a portal's browser).
+      return bearer.startsWith(EXCHANGED_TOKEN_PREFIX)
+        ? this.auth.fromExchangedToken(bearer)
+        : this.auth.fromApiKey(bearer);
     }
     const token = parseCookies(request.headers.cookie ?? '')[SESSION_COOKIE];
     return token ? this.auth.fromSession(token) : null;

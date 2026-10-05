@@ -6,16 +6,19 @@
  */
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHmac, randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt } from 'drizzle-orm';
 import { newId } from '../common/ids.js';
-import { LikhoError, invalid, notFound } from '../common/errors.js';
+import { LikhoError, forbidden, invalid, notFound } from '../common/errors.js';
 import { CONFIG, type Config } from '../config/config.js';
 import { DbService } from '../db/db.module.js';
-import { apiKeys, sessions, users, workspaceMembers, workspaces } from '../db/schema.js';
+import { apiKeys, exchangedTokens, sessions, users, workspaceMembers, workspaces } from '../db/schema.js';
 import { hashPassword, verifyPassword } from './passwords.js';
 
 export const SESSION_COOKIE = 'likho_session';
 const API_KEY_PREFIX = 'lk_';
+/** A token an API key exchanged itself for: short-lived, read-only, for another system's browser. */
+export const EXCHANGED_TOKEN_PREFIX = 'lt_';
+const EXCHANGED_TOKEN_SECONDS = { least: 60, most: 3600, usual: 900 };
 
 /** What a person may do: an admin manages people and settings, a member works with recordings, a viewer reads. */
 export const ROLES = ['admin', 'member', 'viewer'] as const;
@@ -34,6 +37,8 @@ export interface Principal {
   workspaceRole: 'owner' | 'member';
   sessionId?: string;
   apiKeyId?: string;
+  /** Set when the request carries a token an API key exchanged itself for (read-only). */
+  exchangedTokenId?: string;
   /** Where the request came from, for the audit log. */
   ip?: string;
 }
@@ -251,6 +256,69 @@ export class AuthService implements OnModuleInit {
       workspaceId: row.workspace.id,
       workspaceRole: 'member',
       apiKeyId: row.key.id,
+    };
+  }
+
+  // ---------------------------------------------------------------- exchanged tokens
+
+  /**
+   * Hands an API key a short-lived viewer token for another system's browser (a reports portal
+   * embedding the transcript beside a call). The token reads the key's workspace and cannot
+   * change anything or make more tokens. ttlSeconds is held between a minute and an hour.
+   */
+  async exchange(
+    me: Principal,
+    subject: string,
+    ttlSeconds: number = EXCHANGED_TOKEN_SECONDS.usual,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    if (me.kind !== 'api_key' || !me.apiKeyId || me.exchangedTokenId) {
+      throw forbidden('Only an API key can exchange itself for a token.');
+    }
+    if (
+      !Number.isInteger(ttlSeconds) ||
+      ttlSeconds < EXCHANGED_TOKEN_SECONDS.least ||
+      ttlSeconds > EXCHANGED_TOKEN_SECONDS.most
+    ) {
+      throw invalid(
+        `ttlSeconds is between ${EXCHANGED_TOKEN_SECONDS.least} and ${EXCHANGED_TOKEN_SECONDS.most}.`,
+      );
+    }
+    const token = EXCHANGED_TOKEN_PREFIX + randomBytes(24).toString('base64url');
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    await this.db.insert(exchangedTokens).values({
+      id: this.hashToken(token),
+      workspaceId: me.workspaceId,
+      apiKeyId: me.apiKeyId,
+      subject: subject.trim().slice(0, 200),
+      expiresAt,
+    });
+    // Tokens that ran out are of no use to anyone: a little housekeeping on every exchange.
+    void this.db.delete(exchangedTokens).where(lt(exchangedTokens.expiresAt, new Date()));
+    return { token, expiresAt };
+  }
+
+  /** The principal behind an exchanged token: a viewer of the key's workspace, or null. */
+  async fromExchangedToken(token: string): Promise<Principal | null> {
+    if (!token.startsWith(EXCHANGED_TOKEN_PREFIX)) return null;
+    const id = this.hashToken(token);
+    const [row] = await this.db
+      .select({ token: exchangedTokens, key: apiKeys })
+      .from(exchangedTokens)
+      .innerJoin(apiKeys, eq(apiKeys.id, exchangedTokens.apiKeyId))
+      .where(
+        and(eq(exchangedTokens.id, id), gt(exchangedTokens.expiresAt, new Date()), isNull(apiKeys.revokedAt)),
+      );
+    if (!row) return null;
+    return {
+      kind: 'api_key',
+      userId: null,
+      email: '',
+      name: row.token.subject ? `${row.token.subject} (${row.key.name})` : row.key.name,
+      role: 'viewer',
+      workspaceId: row.token.workspaceId,
+      workspaceRole: 'member',
+      apiKeyId: row.key.id,
+      exchangedTokenId: id,
     };
   }
 

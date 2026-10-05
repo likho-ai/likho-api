@@ -267,6 +267,7 @@ export class RecordingsService {
     filter: FactsFilter & {
       status?: RecordingStatus[];
       search?: string;
+      externalId?: string;
       after?: string;
       limit?: number;
     } = {},
@@ -283,6 +284,7 @@ export class RecordingsService {
       const pattern = `%${filter.search.trim().replace(/[%_\\]/g, '\\$&')}%`;
       conditions.push(or(ilike(recordings.originalName, pattern), ilike(recordings.externalId, pattern))!);
     }
+    if (filter.externalId?.trim()) conditions.push(eq(recordings.externalId, filter.externalId.trim()));
     if (filter.after) {
       const [cursor] = await this.db
         .select({ createdAt: recordings.createdAt, id: recordings.id })

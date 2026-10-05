@@ -719,6 +719,9 @@ input RecordingFilter {
   """The disposition attribute, exactly."""
   disposition: String
 
+  """The external id (the dialer’s id of the call), exactly."""
+  externalId: String
+
   """Part of the file name or the external id."""
   search: String
 

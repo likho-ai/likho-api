@@ -161,6 +161,10 @@ export class ListRecordingsQuery {
   @IsIn(RECORDING_STATUSES)
   status?: RecordingStatus;
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
+  @ApiPropertyOptional({ description: 'The external id (the dialer’s id of the call), exactly.' })
+  @IsOptional()
+  @IsString()
+  externalId?: string;
   @ApiPropertyOptional({ description: 'The id of the last recording of the previous page.' })
   @IsOptional()
   @IsString()
@@ -227,6 +231,7 @@ export class RecordingsController {
     const page = await this.recordings.list(me.workspaceId, {
       status: query.status ? [query.status] : undefined,
       search: query.search,
+      externalId: query.externalId,
       after: query.after,
       limit: query.first,
     });

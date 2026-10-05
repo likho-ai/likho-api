@@ -1526,6 +1526,74 @@ describe.skipIf(!stackUp)('likho-api', () => {
     });
   });
 
+  describe('a token for another system’s browser', () => {
+    it('an API key exchanges itself for a short-lived viewer token; a portal reads the transcript with it', async () => {
+      const { createApiKey } = await admin.ok(`mutation { createApiKey(name: "reports portal") { id key } }`);
+      const key: string = createApiKey.key;
+      const crt = `crt-${Date.now()}`;
+      const { requestUpload } = await admin.ok(REQUEST_UPLOAD, {
+        input: { originalName: 'portal.mp3', sizeBytes: 10, externalId: crt },
+      });
+      const id: string = requestUpload.recording.id;
+      const exchange = `${h.url}/api/v1/tokens/exchange`;
+      const post = (auth: Record<string, string>, body: unknown) =>
+        fetch(exchange, {
+          method: 'POST',
+          headers: { ...auth, 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+      const exchanged = await post(
+        { authorization: `Bearer ${key}` },
+        { subject: 'auditor 12', ttlSeconds: 600 },
+      );
+      expect(exchanged.status).toBe(200);
+      const { token, expiresAt } = await exchanged.json();
+      expect(token).toMatch(/^lt_/);
+      expect(new Date(expiresAt).getTime() - Date.now()).toBeGreaterThan(500_000);
+
+      // The token reads the workspace's recordings, by the dialer's id too.
+      const asToken = async (query: string, variables: Record<string, unknown> = {}) =>
+        (
+          await fetch(`${h.url}/graphql`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ query, variables }),
+          })
+        ).json();
+      const found = await asToken(
+        `query ($externalId: String!) { recordings(filter: { externalId: $externalId }) { items { id externalId originalName } } }`,
+        { externalId: crt },
+      );
+      expect(found.data.recordings.items).toEqual([{ id, externalId: crt, originalName: 'portal.mp3' }]);
+      const one = await asToken(`query ($id: String!) { recording(id: $id) { id status } }`, { id });
+      expect(one.data.recording.id).toBe(id);
+      const me = await asToken(`{ me { name role } }`);
+      expect(me.data.me).toEqual({ name: 'auditor 12 (reports portal)', role: 'viewer' });
+
+      // It reads and nothing more; neither it nor a session makes tokens; a made-up token is nobody.
+      const refused = await asToken(
+        `mutation { requestUpload(input: { originalName: "x.mp3", sizeBytes: 1 }) { recording { id } } }`,
+      );
+      expect(refused.errors[0].extensions.code).toBe('forbidden');
+      expect((await post({ authorization: `Bearer ${token}` }, {})).status).toBe(403);
+      expect((await post({ cookie: admin.cookie }, {})).status).toBe(403);
+      expect((await post({ authorization: `Bearer ${key}` }, { ttlSeconds: 5 })).status).toBe(400);
+      const nobody = await fetch(`${h.url}/api/v1/recordings`, {
+        headers: { authorization: 'Bearer lt_nonsense' },
+      });
+      expect(nobody.status).toBe(401);
+
+      // Over REST too, by the dialer's id.
+      const rest = await (
+        await fetch(`${h.url}/api/v1/recordings?externalId=${crt}`, {
+          headers: { authorization: `Bearer ${token}` },
+        })
+      ).json();
+      expect(rest.items.map((r: { id: string }) => r.id)).toEqual([id]);
+    });
+  });
+
   describe('the numbers behind the calls', () => {
     const since = '2026-10-01T00:00:00.000Z';
     const until = '2026-10-03T00:00:00.000Z';
@@ -1676,6 +1744,7 @@ describe.skipIf(!stackUp)('likho-api', () => {
         'spelling.added',
         'spelling.imported',
         'insights.requested',
+        'token.exchanged',
         'spelling.deleted',
         'search.saved',
         'search.deleted',

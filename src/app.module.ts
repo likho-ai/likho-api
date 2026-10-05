@@ -8,6 +8,7 @@ import { AnalyticsResolver } from './analytics/analytics.resolver.js';
 import { AnalyticsService } from './analytics/analytics.service.js';
 import { AuditResolver } from './audit/audit.resolver.js';
 import { AuthModule } from './auth/auth.module.js';
+import { TokensController } from './auth/tokens.controller.js';
 import { BusModule } from './bus/bus.module.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { LikhoError } from './common/errors.js';
@@ -94,6 +95,7 @@ export function appModule(config?: Config) {
       VocabularyController,
       InsightsController,
       AnalyticsController,
+      TokensController,
       LiveController,
     ],
     providers: [

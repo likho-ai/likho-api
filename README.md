@@ -127,6 +127,7 @@ Then, through the gateway at http://localhost:8080:
 | `POST /graphql` | The GraphQL API; `schema.graphql` in this repository is the schema |
 | `GET /api/docs`, `GET /api/openapi.json` | The REST API, described; `openapi.json` and the Postman collection in `postman/` are the same |
 | `GET /events/jobs/:id`, `GET /events/recordings`, `GET /events/recordings/:id` | Live updates as server-sent events: one job's lines and end; everything in the workspace; one recording's jobs, status and insights |
+| `POST /api/v1/tokens/exchange` | With an API key: a short-lived viewer token (`lt_…`) for another system's browser, such as the transcript embedded beside a call in a reports portal |
 | `GET /healthz`, `GET /readyz` | Alive; database, Redis and bus answer |
 
 With Docker, on the stack's network:
@@ -179,6 +180,25 @@ curl -H "Authorization: Bearer lk_..." -H "Content-Type: application/json" \
 curl -X PUT --data-binary @call.mp3 "<uploadUrl>"
 curl -H "Authorization: Bearer lk_..." http://localhost:8080/api/v1/recordings/rec_.../transcript
 ```
+
+## Another system's page
+
+A reports portal that wants the transcript beside a call keeps a Likho API key on its own
+server, never in the browser. When its page opens, the portal's backend exchanges the key for
+a viewer token that lives at most an hour and hands the page the address of Likho's embed
+page with that token in the fragment:
+
+```bash
+curl -X POST -H "Authorization: Bearer lk_..." -H "Content-Type: application/json" \
+  -d '{"subject":"auditor 12","ttlSeconds":900}' http://localhost:8080/api/v1/tokens/exchange
+# → { "token": "lt_...", "expiresAt": "2026-10-05T14:30:00.000Z" }
+#   the page: <iframe src="http://likho.example.com/embed/recordings/<the dialer's id>#token=lt_...">
+```
+
+The token reads the workspace (`Authorization: Bearer lt_...`, GraphQL or REST) and nothing
+more: no changes, no further tokens. `recordings(filter: { externalId })` /
+`GET /api/v1/recordings?externalId=` finds a call by the id the other system knows it by.
+Exchanges are audited as `token.exchanged`.
 
 Errors always look like `{"error": {"code": "not_found", "message": "The recording was not found."}}`
 with the codes `unauthenticated`, `forbidden`, `not_found`, `invalid`, `conflict`,

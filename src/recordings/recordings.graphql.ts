@@ -145,6 +145,8 @@ export class CreateJobInput {
 export class RecordingFilter {
   @Field(() => [RecordingStatusEnum], { nullable: true }) status?: (keyof typeof RecordingStatusEnum)[];
   @Field({ nullable: true, description: 'Part of the file name or the external id.' }) search?: string;
+  @Field({ nullable: true, description: 'The external id (the dialer’s id of the call), exactly.' })
+  externalId?: string;
   @Field({ nullable: true, description: 'The campaign attribute, exactly.' }) campaign?: string;
   @Field({ nullable: true, description: 'The agent attribute, exactly.' }) agent?: string;
   @Field({ nullable: true, description: 'The disposition attribute, exactly.' }) disposition?: string;

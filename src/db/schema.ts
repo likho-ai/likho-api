@@ -150,6 +150,29 @@ export const apiKeys = pgTable(
   (table) => [index('api_keys_workspace').on(table.workspaceId)],
 );
 
+/**
+ * Short-lived viewer tokens made from an API key for another system's browser: a reports portal
+ * that embeds the transcript beside a call. They read the workspace and nothing more.
+ */
+export const exchangedTokens = pgTable(
+  'exchanged_tokens',
+  {
+    /** A hash of the token; the token itself goes to the other system once. */
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    apiKeyId: text('api_key_id')
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: 'cascade' }),
+    /** Who the other system says is looking (its own user), for the audit log. */
+    subject: text().notNull().default(''),
+    createdAt: now(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('exchanged_tokens_expires').on(table.expiresAt)],
+);
+
 /** What a recording is going through. */
 export const RECORDING_STATUSES = [
   'uploading', // an upload link was handed out

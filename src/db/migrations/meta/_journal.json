@@ -43,6 +43,13 @@
       "when": 1791197390905,
       "tag": "0005_recording_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791209210256,
+      "tag": "0006_exchanged_tokens",
+      "breakpoints": true
     }
   ]
 }

@@ -89,6 +89,15 @@
             }
           },
           {
+            "name": "externalId",
+            "required": false,
+            "in": "query",
+            "description": "The external id (the dialer’s id of the call), exactly.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "after",
             "required": false,
             "in": "query",
@@ -1113,6 +1122,37 @@
         ]
       }
     },
+    "/api/v1/tokens/exchange": {
+      "post": {
+        "description": "With an API key: a token (lt_…) that reads this workspace for at most an hour, for a page another system embeds, such as the transcript beside a call in a reports portal. The page sends it as `Authorization: Bearer`; it cannot change anything or make more tokens.",
+        "operationId": "TokensController_exchange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A short-lived viewer token for another system’s browser",
+        "tags": [
+          "tokens"
+        ]
+      }
+    },
     "/events/jobs/{id}": {
       "get": {
         "operationId": "LiveController_job",
@@ -1329,6 +1369,19 @@
           "force": {
             "type": "boolean",
             "description": "Analyse again even when the recording has insights."
+          }
+        }
+      },
+      "ExchangeDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "Who is looking, in the other system’s own terms (its user); kept for the audit log."
+          },
+          "ttlSeconds": {
+            "type": "number",
+            "description": "How long the token lives: 60 to 3600 seconds (default 900)."
           }
         }
       }

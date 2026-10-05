@@ -39,6 +39,7 @@ export class RecordingsResolver {
     const page = await this.service.list(me.workspaceId, {
       status: filter?.status,
       search: filter?.search,
+      externalId: filter?.externalId,
       campaign: filter?.campaign,
       agent: filter?.agent,
       disposition: filter?.disposition,
