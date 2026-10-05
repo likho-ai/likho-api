@@ -67,11 +67,14 @@ export class LiveController {
 
   @Sse('recordings/:id')
   async recording(@CurrentUser() me: Principal, @Param('id') id: string): Promise<Observable<Sent>> {
-    await this.recordings.get(me.workspaceId, id); // not found when it is another workspace's
+    const recording = await this.recordings.get(me.workspaceId, id); // not found when it is another workspace's
     return new Observable<Sent>((observer) => {
       const subscription = this.live
         .watch((update) => update.recordingId === id && update.kind !== 'segment')
         .subscribe((update) => observer.next(sent(update)));
+      // The first event says the stream is open (and where the recording stands): a client that
+      // waits for it before acting cannot miss what follows.
+      observer.next({ type: 'open', data: { recordingId: id, status: recording.status } });
       return () => subscription.unsubscribe();
     });
   }

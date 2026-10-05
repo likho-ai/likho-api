@@ -158,9 +158,10 @@ query { recording(id: "rec_...") {
 
 While a job runs, `GET /events/jobs/<job id>` streams `segment` events (`textScript`,
 `textRoman`, `startSeconds`, `endSeconds`) and ends with a `job` event whose `status` is `done`.
-`GET /events/recordings/<recording id>` streams the `job`, `recording` and `insights` events of
-one recording: when the model's answer is in (`status: done`, with the sentiment and the score)
-the page fetches `recording { insights { ... } }`.
+`GET /events/recordings/<recording id>` opens with an `open` event (the recording's status) and
+then streams the `job`, `recording` and `insights` events of that recording: when the model's
+answer is in (`status: done`, with the sentiment and the score) the page fetches
+`recording { insights { ... } }`.
 
 ## A script, in REST
 

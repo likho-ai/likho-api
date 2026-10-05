@@ -1362,23 +1362,30 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(bare.insights).toBeNull();
 
       // likho-insights analysed the transcript and said so; the open page hears it and fetches.
-      const watching = readEvents(h.url, `/events/recordings/${recording.id}`, admin.cookie, (events) =>
-        events.some((e) => e.type === 'insights'),
-      );
+      // The stream opens with an `open` event; the answer is published only once it has arrived,
+      // so it cannot be relayed before the page listens.
       const made = h.insights.add(transcript.id, recording.id, workspaceId);
-      await h.publish('likho.insights.completed', 'likho.insights.completed.v1', {
-        insights_id: made.id,
-        transcript_id: transcript.id,
-        recording_id: recording.id,
-        workspace_id: workspaceId,
-        model: 'fake/one',
-        sentiment: 'positive',
-        score_total: 13,
-        score_max: 15,
-        input_tokens: 100,
-        output_tokens: 50,
+      let published = false;
+      const watching = readEvents(h.url, `/events/recordings/${recording.id}`, admin.cookie, (events) => {
+        if (!published) {
+          published = true;
+          void h.publish('likho.insights.completed', 'likho.insights.completed.v1', {
+            insights_id: made.id,
+            transcript_id: transcript.id,
+            recording_id: recording.id,
+            workspace_id: workspaceId,
+            model: 'fake/one',
+            sentiment: 'positive',
+            score_total: 13,
+            score_max: 15,
+            input_tokens: 100,
+            output_tokens: 50,
+          });
+        }
+        return events.some((e) => e.type === 'insights');
       });
       const events = await watching;
+      expect(events[0]).toEqual({ type: 'open', data: { recordingId: recording.id, status: 'done' } });
       expect(events.find((e) => e.type === 'insights')!.data).toEqual({
         recordingId: recording.id,
         status: 'done',
@@ -1431,16 +1438,20 @@ describe.skipIf(!stackUp)('likho-api', () => {
       expect(h.insights.asked.at(-1)).toEqual({ transcriptId: transcript.id, workspaceId, force: true });
 
       // A failure is heard too.
-      const failing = readEvents(h.url, `/events/recordings/${recording.id}`, admin.cookie, (events) =>
-        events.some((e) => e.type === 'insights' && e.data.status === 'failed'),
-      );
-      await h.publish('likho.insights.failed', 'likho.insights.failed.v1', {
-        transcript_id: transcript.id,
-        recording_id: recording.id,
-        workspace_id: workspaceId,
-        code: 'model_error',
-        message: 'The model is rate limited',
-        attempt: 1,
+      let failurePublished = false;
+      const failing = readEvents(h.url, `/events/recordings/${recording.id}`, admin.cookie, (events) => {
+        if (!failurePublished) {
+          failurePublished = true;
+          void h.publish('likho.insights.failed', 'likho.insights.failed.v1', {
+            transcript_id: transcript.id,
+            recording_id: recording.id,
+            workspace_id: workspaceId,
+            code: 'model_error',
+            message: 'The model is rate limited',
+            attempt: 1,
+          });
+        }
+        return events.some((e) => e.type === 'insights' && e.data.status === 'failed');
       });
       expect((await failing).find((e) => e.type === 'insights')!.data).toEqual({
         recordingId: recording.id,
@@ -1482,8 +1493,15 @@ describe.skipIf(!stackUp)('likho-api', () => {
       });
       expect(missing.status).toBe(404);
 
+      const auth = h.app.get((await import('../src/auth/auth.service.js')).AuthService);
+      const stranger = await auth.createUser({
+        email: 'insights-other@example.test',
+        name: 'Other',
+        password: 'other-password-1',
+      });
+      await auth.createWorkspace('Another workspace', stranger.id);
       const other = new Browser(h.url);
-      await other.login('other@example.test', 'other-password-1');
+      await other.login('insights-other@example.test', 'other-password-1');
       expect(await other.fails(INSIGHTS, { id })).toBe('not_found');
       expect(await other.fails(ANALYSE, { id })).toBe('not_found');
       const stream = await fetch(`${h.url}/events/recordings/${id}`, {
