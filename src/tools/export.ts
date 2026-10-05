@@ -21,7 +21,13 @@ const app = await NestFactory.create(appModule(config), { logger: ['warn', 'erro
 await app.init();
 
 const schema = app.get(GraphQLSchemaHost).schema;
-await writeFile('schema.graphql', printSchema(schema) + '\n');
+// The same bytes the service writes on a development start (NestJS's header, no trailing
+// newline), so the committed file never drifts between the two.
+const HEADER =
+  '# ------------------------------------------------------\n' +
+  '# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)\n' +
+  '# ------------------------------------------------------\n\n';
+await writeFile('schema.graphql', HEADER + printSchema(schema));
 console.log('schema.graphql written');
 
 const document = SwaggerModule.createDocument(
