@@ -1098,6 +1098,14 @@ describe.skipIf(!stackUp)('likho-api', () => {
         body: JSON.stringify({ originalName: 'from-script.mp3', sizeBytes: 999, externalId: 'ext-9' }),
       });
       expect(created.status).toBe(201);
+      // The admin sees when the key was last used.
+      const used = await until(async () => {
+        const { apiKeys } = await admin.ok(`{ apiKeys { id lastUsedAt } }`);
+        return apiKeys.find(
+          (k: { id: string; lastUsedAt: string | null }) => k.id === createApiKey.id && k.lastUsedAt,
+        );
+      }, 'the key’s last use to be noted');
+      expect(Date.now() - new Date(used.lastUsedAt).getTime()).toBeLessThan(60_000);
       const body = await created.json();
       expect(body.uploadUrl).toMatch(/^http:\/\/media\.test\//);
       expect(body.recording).toMatchObject({

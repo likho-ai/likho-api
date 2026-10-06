@@ -243,9 +243,16 @@ export class AuthService implements OnModuleInit {
       .innerJoin(workspaces, eq(workspaces.id, apiKeys.workspaceId))
       .where(and(eq(apiKeys.hash, this.hashToken(key)), isNull(apiKeys.revokedAt)));
     if (!row) return null;
-    // Last use is informational; not worth a write on every request.
+    // Last use is informational: written at most once a minute, and the request does not wait for it.
+    // (A query is only sent once something awaits it, so the write is started with .then.)
     if (!row.key.lastUsedAt || Date.now() - row.key.lastUsedAt.getTime() > 60_000) {
-      void this.db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, row.key.id));
+      this.db
+        .update(apiKeys)
+        .set({ lastUsedAt: new Date() })
+        .where(eq(apiKeys.id, row.key.id))
+        .then(undefined, (error: unknown) =>
+          this.log.warn(`could not note the last use of key ${row.key.id}: ${String(error)}`),
+        );
     }
     return {
       kind: 'api_key',
