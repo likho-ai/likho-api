@@ -1,14 +1,10 @@
-/** Workspace settings and API keys. Admins only for the keys. */
+/** Workspace settings and API keys. Admins only for changes and for the keys. */
 import { Args, Field, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
 import { AuditService } from '../audit/audit.service.js';
 import { AdminOnly, CurrentUser } from '../auth/auth.guard.js';
 import { AuthService, type Principal } from '../auth/auth.service.js';
-import { RecordingsService } from '../recordings/recordings.service.js';
-
-@ObjectType()
-export class Settings {
-  @Field({ description: 'Queue a job as soon as a recording is ready.' }) autoTranscribe: boolean;
-}
+import { Settings, SettingsInput } from './settings.graphql.js';
+import { SettingsService } from './settings.service.js';
 
 @ObjectType()
 export class ApiKey {
@@ -28,30 +24,29 @@ export class NewApiKey {
 @Resolver()
 export class SettingsResolver {
   constructor(
-    private readonly recordings: RecordingsService,
+    private readonly store: SettingsService,
     private readonly auth: AuthService,
     private readonly audit: AuditService,
   ) {}
 
-  @Query(() => Settings)
-  async settings(@CurrentUser() me: Principal): Promise<Settings> {
-    return { autoTranscribe: await this.recordings.autoTranscribe(me.workspaceId) };
+  @Query(() => Settings, { description: 'Every setting of the workspace, the defaults filled in.' })
+  settings(@CurrentUser() me: Principal): Promise<Settings> {
+    return this.store.read(me.workspaceId);
   }
 
   @AdminOnly()
-  @Mutation(() => Settings)
-  async updateSettings(
-    @CurrentUser() me: Principal,
-    @Args('autoTranscribe') autoTranscribe: boolean,
-  ): Promise<Settings> {
-    await this.recordings.setAutoTranscribe(me.workspaceId, autoTranscribe);
-    await this.audit.record(
-      me,
-      'settings.updated',
-      { kind: 'workspace', id: me.workspaceId },
-      { autoTranscribe },
-    );
-    return { autoTranscribe };
+  @Mutation(() => Settings, { description: 'Changes the settings given; the rest keep their values.' })
+  async updateSettings(@CurrentUser() me: Principal, @Args('input') input: SettingsInput): Promise<Settings> {
+    const { settings, changed } = await this.store.update(me.workspaceId, input, me.userId);
+    if (changed.length > 0) {
+      await this.audit.record(
+        me,
+        'settings.updated',
+        { kind: 'workspace', id: me.workspaceId },
+        { keys: changed },
+      );
+    }
+    return settings;
   }
 
   @AdminOnly()

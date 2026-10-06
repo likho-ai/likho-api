@@ -603,11 +603,21 @@ export class RecordingsService {
     status: RecordingStatus,
     extra: Partial<RecordingRow> = {},
   ): Promise<void> {
-    await this.db
+    await this.writeRecordingStatus(this.db, id, status, extra);
+    await this.live.publish({ kind: 'recording', recordingId: id, data: { status, ...extra } });
+  }
+
+  /** The recording's status written with `db`: the service's connection, or a transaction. */
+  private async writeRecordingStatus(
+    db: Pick<typeof this.db, 'update'>,
+    id: string,
+    status: RecordingStatus,
+    extra: Partial<RecordingRow> = {},
+  ): Promise<void> {
+    await db
       .update(recordings)
       .set({ status, updatedAt: new Date(), ...extra })
       .where(eq(recordings.id, id));
-    await this.live.publish({ kind: 'recording', recordingId: id, data: { status, ...extra } });
   }
 
   /** likho.media.ready: the file is audio. Queue a job when the workspace wants that. */
@@ -635,16 +645,21 @@ export class RecordingsService {
 
   /** A worker took the job (the started event, or the first line). totalSeconds 0 = not known yet. */
   async onJobStarted(jobId: string, totalSeconds: number): Promise<void> {
-    const [job] = await this.db
-      .update(jobs)
-      .set({
-        status: 'running',
-        startedAt: new Date(),
-        lastProgressAt: new Date(),
-        ...(totalSeconds > 0 ? { totalSeconds } : {}),
-      })
-      .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued')))
-      .returning();
+    // The job and its recording change together, so nobody reads one without the other.
+    const job = await this.db.transaction(async (tx) => {
+      const [taken] = await tx
+        .update(jobs)
+        .set({
+          status: 'running',
+          startedAt: new Date(),
+          lastProgressAt: new Date(),
+          ...(totalSeconds > 0 ? { totalSeconds } : {}),
+        })
+        .where(and(eq(jobs.id, jobId), eq(jobs.status, 'queued')))
+        .returning();
+      if (taken) await this.writeRecordingStatus(tx, taken.recordingId, 'transcribing');
+      return taken;
+    });
     if (!job) {
       // A worker took a request that was given up on in the meantime (a stalled job's request,
       // delivered once more to the worker that came back; a job cancelled while it waited): stop it.
@@ -661,7 +676,11 @@ export class RecordingsService {
       }
       return;
     }
-    await this.setRecordingStatus(job.recordingId, 'transcribing');
+    await this.live.publish({
+      kind: 'recording',
+      recordingId: job.recordingId,
+      data: { status: 'transcribing' },
+    });
     await this.live.publish({
       kind: 'job',
       jobId,
@@ -692,31 +711,40 @@ export class RecordingsService {
       audioSeconds: number;
     },
   ): Promise<void> {
-    const [job] = await this.db
-      .update(jobs)
-      .set({
-        status: 'done',
-        finishedAt: new Date(),
-        transcriptId: result.transcriptId,
-        progressSeconds: result.audioSeconds,
-        totalSeconds: result.audioSeconds,
-        errorCode: '',
-        errorMessage: '',
-      })
-      // A transcript is never thrown away: a job given up on (cancelled, stalled) whose worker
-      // finished it anyway is done after all.
-      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running', 'cancelled', 'failed'])))
-      .returning();
+    const done = {
+      latestTranscriptId: result.transcriptId,
+      detectedLanguage: result.detectedLanguage,
+      languageProbability: result.languageProbability,
+      durationSeconds: result.audioSeconds,
+    };
+    const job = await this.db.transaction(async (tx) => {
+      const [finished] = await tx
+        .update(jobs)
+        .set({
+          status: 'done',
+          finishedAt: new Date(),
+          transcriptId: result.transcriptId,
+          progressSeconds: result.audioSeconds,
+          totalSeconds: result.audioSeconds,
+          errorCode: '',
+          errorMessage: '',
+        })
+        // A transcript is never thrown away: a job given up on (cancelled, stalled) whose worker
+        // finished it anyway is done after all.
+        .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running', 'cancelled', 'failed'])))
+        .returning();
+      if (finished) await this.writeRecordingStatus(tx, finished.recordingId, 'done', done);
+      return finished;
+    });
     if (!job) return;
     this.metrics.jobsFinished.add(1, { status: 'done' });
     const wallSeconds = (job.finishedAt!.getTime() - (job.startedAt ?? job.createdAt).getTime()) / 1000;
     if (wallSeconds > 0 && result.audioSeconds > 0)
       this.metrics.realtimeFactor.record(result.audioSeconds / wallSeconds);
-    await this.setRecordingStatus(job.recordingId, 'done', {
-      latestTranscriptId: result.transcriptId,
-      detectedLanguage: result.detectedLanguage,
-      languageProbability: result.languageProbability,
-      durationSeconds: result.audioSeconds,
+    await this.live.publish({
+      kind: 'recording',
+      recordingId: job.recordingId,
+      data: { status: 'done', ...done },
     });
     await this.live.publish({
       kind: 'job',
@@ -728,18 +756,27 @@ export class RecordingsService {
 
   async onJobFailed(jobId: string, code: string, message: string): Promise<void> {
     const status = code === 'cancelled' ? 'cancelled' : 'failed';
-    const [job] = await this.db
-      .update(jobs)
-      .set({ status, finishedAt: new Date(), errorCode: code, errorMessage: message })
-      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running'])))
-      .returning();
-    if (!job) return;
+    const outcome = await this.db.transaction(async (tx) => {
+      const [stopped] = await tx
+        .update(jobs)
+        .set({ status, finishedAt: new Date(), errorCode: code, errorMessage: message })
+        .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['queued', 'running'])))
+        .returning();
+      if (!stopped) return null;
+      const [recording] = await tx.select().from(recordings).where(eq(recordings.id, stopped.recordingId));
+      let back: RecordingStatus | null = null;
+      if (recording && (recording.status === 'queued' || recording.status === 'transcribing')) {
+        // Back to where it was: a transcript from an earlier job still counts.
+        back = recording.latestTranscriptId ? 'done' : 'ready';
+        await this.writeRecordingStatus(tx, stopped.recordingId, back);
+      }
+      return { job: stopped, back };
+    });
+    if (!outcome) return;
+    const { job, back } = outcome;
     this.metrics.jobsFinished.add(1, { status });
-    const [recording] = await this.db.select().from(recordings).where(eq(recordings.id, job.recordingId));
-    if (recording && (recording.status === 'queued' || recording.status === 'transcribing')) {
-      // Back to where it was: a transcript from an earlier job still counts.
-      await this.setRecordingStatus(job.recordingId, recording.latestTranscriptId ? 'done' : 'ready');
-    }
+    if (back)
+      await this.live.publish({ kind: 'recording', recordingId: job.recordingId, data: { status: back } });
     await this.live.publish({
       kind: 'job',
       jobId,

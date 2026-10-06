@@ -202,6 +202,163 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""An agent of the dialer, with the calls taken in the window."""
+type DialerAgent {
+  calls: Int!
+  connected: Int!
+
+  """The dialer’s user id."""
+  id: String!
+
+  """The dialer’s user name."""
+  name: String!
+  talkSeconds: Int!
+}
+
+"""One leg of a call as the dialer logged it."""
+type DialerCall {
+  agent: String!
+  agentId: String!
+
+  """The leg’s id."""
+  callId: String!
+
+  """When the call happened, as the dialer writes it (its own clock)."""
+  callTime: String!
+
+  """inbound, outbound, transferred: the dialer’s own words."""
+  callType: String!
+  campaign: String!
+  connected: Boolean!
+
+  """The interaction’s id: the key of the recording."""
+  crtObjectId: String!
+  disposition: String!
+
+  """Who hung up: customer, agent, system."""
+  hangupBy: String!
+
+  """Shortened to the digits the connector may show."""
+  phone: String!
+  queue: String!
+
+  """The recording in Likho, when this call was fetched already."""
+  recordingId: String
+
+  """Its status in Likho, when fetched."""
+  recordingStatus: String
+
+  """Customer talk time, in seconds."""
+  talkSeconds: Int!
+
+  """The campaign the call was transferred to, when it was."""
+  transferredCampaign: String!
+}
+
+type DialerCallPage {
+  items: [DialerCall!]!
+
+  """Pass as `after` for the next page; null at the end."""
+  nextCursor: String
+}
+
+"""Which calls of the dialer; since and until are required."""
+input DialerCallsFilter {
+  agent: String
+  campaign: String
+
+  """Only calls that connected (default true)."""
+  connectedOnly: Boolean
+
+  """Only calls with at least this much talk time."""
+  minTalkSeconds: Int
+  since: DateTime!
+  until: DateTime!
+}
+
+"""A campaign of the dialer, with its calls in the window."""
+type DialerCampaign {
+  """Legs the dialer logged (a transferred call has two)."""
+  calls: Int!
+
+  """Of those, the ones that connected."""
+  connected: Int!
+
+  """Interactions: one recording each."""
+  interactions: Int!
+  name: String!
+
+  """Customer talk time of the connected legs, in seconds."""
+  talkSeconds: Int!
+}
+
+"""What the dialer connector does for this workspace."""
+type DialerSettings {
+  """How many calls one run fetches at most."""
+  batchLimit: Int!
+
+  """The campaigns the schedule takes; empty = every campaign."""
+  campaigns: [String!]!
+
+  """How many calls the schedule fetches a day at most."""
+  dailyLimit: Int!
+
+  """Calls with less customer talk time than this (seconds) are left out."""
+  minTalkSeconds: Int!
+
+  """Digits of a phone number kept on a recording; 0 = none."""
+  phoneDigits: Int!
+
+  """How often the schedule looks for new calls, in seconds."""
+  pollIntervalSeconds: Int!
+
+  """
+  The schedule runs: new calls are fetched from the dialer every so often.
+  """
+  scheduleEnabled: Boolean!
+
+  """Transcripts are written back to the CRM."""
+  writebackEnabled: Boolean!
+}
+
+input DialerSettingsInput {
+  batchLimit: Int
+  campaigns: [String!]
+  dailyLimit: Int
+  minTalkSeconds: Int
+  phoneDigits: Int
+  pollIntervalSeconds: Int
+  scheduleEnabled: Boolean
+  writebackEnabled: Boolean
+}
+
+"""What the dialer connector is doing for this workspace."""
+type DialerStatus {
+  """
+  The archive of old recordings is looked in when the live server has none.
+  """
+  archiveEnabled: Boolean!
+  campaigns: [String!]!
+
+  """
+  Where the schedule stands: the dialer’s call time of the last call taken.
+  """
+  cursor: String!
+  dailyLimit: Int!
+
+  """
+  The reporting database is configured: lists and the schedule are possible.
+  """
+  databaseConfigured: Boolean!
+  importedToday: Int!
+  lastRunAt: DateTime
+  lastRunSummary: String!
+  minTalkSeconds: Int!
+  scheduleEnabled: Boolean!
+  version: String!
+  writebackEnabled: Boolean!
+}
+
 type Engine {
   available: Boolean!
   engine: String!
@@ -511,6 +668,11 @@ type Mutation {
   requestImport(input: RequestImportInput!): Import!
 
   """
+  Asks the dialer connector for several calls by their ids (at most 200 at a time).
+  """
+  requestImports(externalIds: [String!]!, source: String): [Import!]!
+
+  """
   Mails a link to choose a new password. Always answers true, so an address cannot be probed. Without mail set up, ask an admin.
   """
   requestPasswordReset(email: String!): Boolean!
@@ -539,7 +701,9 @@ type Mutation {
   Changes what a person may do. You cannot take your own admin role away.
   """
   setUserRole(role: Role!, userId: String!): User!
-  updateSettings(autoTranscribe: Boolean!): Settings!
+
+  """Changes the settings given; the rest keep their values."""
+  updateSettings(input: SettingsInput!): Settings!
   upsertGlossaryTerm(input: GlossaryTermInput!): GlossaryTerm!
   upsertSpelling(input: SpellingInput!): Spelling!
 }
@@ -583,6 +747,27 @@ type Query {
 
   """Every correction made to a recording’s transcripts, newest first."""
   corrections(recordingId: String!): [Correction!]!
+
+  """
+  The dialer’s agents that took calls in the window (of one campaign when given).
+  """
+  dialerAgents(campaign: String, since: DateTime!, until: DateTime!): [DialerAgent!]!
+
+  """One call of the dialer by the interaction’s id."""
+  dialerCall(crtObjectId: String!): DialerCall!
+
+  """
+  The dialer’s calls of the window, newest first, a page at a time; each says whether Likho has it already.
+  """
+  dialerCalls(after: String, filter: DialerCallsFilter!, first: Int): DialerCallPage!
+
+  """
+  The dialer’s campaigns that had calls between since and until, most calls first.
+  """
+  dialerCampaigns(since: DateTime!, until: DateTime!): [DialerCampaign!]!
+
+  """What the dialer connector is doing: schedule, budget, cursor."""
+  dialerStatus: DialerStatus!
 
   """The speech models a worker can run."""
   engines: [Engine!]!
@@ -637,6 +822,8 @@ type Query {
   Transcript lines matching a few words, in either layer, typos allowed; best first. Narrowed by language, recording, campaign, agent, disposition, source, or when the call happened.
   """
   search(filter: SearchFilter, page: Int, pageSize: Int, query: String!): SearchPage!
+
+  """Every setting of the workspace, the defaults filled in."""
   settings: Settings!
   spellings: [Spelling!]!
 
@@ -644,6 +831,9 @@ type Query {
   The spellings as CSV: source, target, enabled, applied, last_applied_at.
   """
   spellingsCsv: String!
+
+  """Whether every service of the platform answers right now."""
+  systemStatus: SystemStatus!
 
   """One transcript with every line, both layers."""
   transcript(id: String!): Transcript!
@@ -899,9 +1089,30 @@ type Segment {
   textScript: String!
 }
 
+"""One service of the platform and whether it answers right now."""
+type ServiceStatus {
+  """Where likho-api reaches it."""
+  address: String!
+
+  """What it said, or why it did not answer."""
+  detail: String!
+
+  """How long the answer took, in milliseconds."""
+  latencyMs: Float!
+  name: String!
+  ok: Boolean!
+}
+
 type Settings {
   """Queue a job as soon as a recording is ready."""
   autoTranscribe: Boolean!
+  dialer: DialerSettings!
+}
+
+"""The settings to change; a field left out keeps its value."""
+input SettingsInput {
+  autoTranscribe: Boolean
+  dialer: DialerSettingsInput
 }
 
 type Spelling {
@@ -938,6 +1149,14 @@ input SpellingInput {
   id: String
   source: String!
   target: String!
+}
+
+type SystemStatus {
+  checkedAt: DateTime!
+  services: [ServiceStatus!]!
+
+  """likho-api’s version."""
+  version: String!
 }
 
 type Transcript {

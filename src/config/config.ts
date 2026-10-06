@@ -25,6 +25,8 @@ const schema = z.object({
   SEARCH_GRPC_ADDR: z.string().default('localhost:5040'),
   INSIGHTS_GRPC_ADDR: z.string().default('localhost:5050'),
   ANALYTICS_GRPC_ADDR: z.string().default('localhost:5070'),
+  /** The dialer connector's gRPC side (likho.dialer.v1): the dialer's campaigns, agents and calls. */
+  DIALER_GRPC_ADDR: z.string().default('localhost:5060'),
   /** Which connector answers import requests by default ('ameyo'). Empty = imports are off. */
   IMPORT_SOURCE: z.string().default('ameyo'),
   RPC_TIMEOUT_SECONDS: seconds.default(10),

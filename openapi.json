@@ -1122,6 +1122,223 @@
         ]
       }
     },
+    "/api/v1/dialer/campaigns": {
+      "get": {
+        "operationId": "DialerController_campaigns",
+        "parameters": [
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "description": "The start of the window of call time (ISO 8601), included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": true,
+            "in": "query",
+            "description": "The end of the window (ISO 8601), not included.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The dialer’s campaigns of a window, with their counts",
+        "tags": [
+          "dialer"
+        ]
+      }
+    },
+    "/api/v1/dialer/agents": {
+      "get": {
+        "operationId": "DialerController_agents",
+        "parameters": [
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "description": "The start of the window of call time (ISO 8601), included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": true,
+            "in": "query",
+            "description": "The end of the window (ISO 8601), not included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaign",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The dialer’s agents of a window",
+        "tags": [
+          "dialer"
+        ]
+      }
+    },
+    "/api/v1/dialer/calls": {
+      "get": {
+        "operationId": "DialerController_calls",
+        "parameters": [
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "description": "The start of the window of call time (ISO 8601), included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": true,
+            "in": "query",
+            "description": "The end of the window (ISO 8601), not included.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaign",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectedOnly",
+            "required": false,
+            "in": "query",
+            "description": "Only calls that connected (default true).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "minTalkSeconds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "The nextCursor of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "first",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The dialer’s calls of a window, newest first, a page at a time",
+        "tags": [
+          "dialer"
+        ]
+      }
+    },
+    "/api/v1/dialer/status": {
+      "get": {
+        "operationId": "DialerController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What the dialer connector is doing",
+        "tags": [
+          "dialer"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "description": "The defaults filled in. The dialer connector reads its schedule, campaigns, budget and write-back here, and again whenever likho.settings.changed says they changed.",
+        "operationId": "SettingsController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every setting of the workspace",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/v1/tokens/exchange": {
       "post": {
         "description": "With an API key: a token (lt_…) that reads this workspace for at most an hour, for a page another system embeds, such as the transcript beside a call in a reports portal. The page sends it as `Authorization: Bearer`; it cannot change anything or make more tokens.",

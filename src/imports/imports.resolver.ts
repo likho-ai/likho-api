@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser, MinRole } from '../auth/auth.guard.js';
 import type { Principal } from '../auth/auth.service.js';
 import { Import, ImportPage, ImportStatusEnum, RequestImportInput } from './imports.graphql.js';
+import { invalid } from '../common/errors.js';
 import { ImportsService } from './imports.service.js';
 
 @Resolver(() => Import)
@@ -11,6 +12,32 @@ export class ImportsResolver {
     private readonly service: ImportsService,
     private readonly audit: AuditService,
   ) {}
+
+  @MinRole('member')
+  @Mutation(() => [Import], {
+    description: 'Asks the dialer connector for several calls by their ids (at most 200 at a time).',
+  })
+  async requestImports(
+    @CurrentUser() me: Principal,
+    @Args('externalIds', { type: () => [String] }) externalIds: string[],
+    @Args('source', { nullable: true }) source?: string,
+  ): Promise<Import[]> {
+    const ids = [...new Set(externalIds.map((id) => id.trim()).filter(Boolean))];
+    if (ids.length === 0) throw invalid('Give at least one call id.');
+    if (ids.length > 200) throw invalid('At most 200 calls at a time.');
+    const rows: Import[] = [];
+    for (const externalId of ids) {
+      const row = await this.service.request(me.workspaceId, me.userId, { externalId, source });
+      rows.push(row);
+    }
+    await this.audit.record(
+      me,
+      'import.requested',
+      { kind: 'import', id: rows[0]!.id },
+      { source: rows[0]!.source, externalIds: ids, count: ids.length },
+    );
+    return rows;
+  }
 
   @MinRole('member')
   @Mutation(() => Import, {

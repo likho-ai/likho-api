@@ -7,6 +7,13 @@ import { AnalyticsController } from './analytics/analytics.controller.js';
 import { AnalyticsResolver } from './analytics/analytics.resolver.js';
 import { AnalyticsService } from './analytics/analytics.service.js';
 import { AuditResolver } from './audit/audit.resolver.js';
+import { DialerController } from './dialer/dialer.controller.js';
+import { DialerResolver } from './dialer/dialer.resolver.js';
+import { DialerService } from './dialer/dialer.service.js';
+import { SettingsController } from './settings/settings.controller.js';
+import { SettingsService } from './settings/settings.service.js';
+import { SystemResolver } from './system/system.resolver.js';
+import { SystemService } from './system/system.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { TokensController } from './auth/tokens.controller.js';
 import { BusModule } from './bus/bus.module.js';
@@ -95,6 +102,8 @@ export function appModule(config?: Config) {
       VocabularyController,
       InsightsController,
       AnalyticsController,
+      DialerController,
+      SettingsController,
       TokensController,
       LiveController,
     ],
@@ -106,6 +115,9 @@ export function appModule(config?: Config) {
       VocabularyService,
       InsightsService,
       AnalyticsService,
+      DialerService,
+      SettingsService,
+      SystemService,
       EventsConsumer,
       JobsSweeper,
       RecordingsResolver,
@@ -116,6 +128,8 @@ export function appModule(config?: Config) {
       VocabularyResolver,
       InsightsResolver,
       AnalyticsResolver,
+      DialerResolver,
+      SystemResolver,
       SettingsResolver,
       UsersResolver,
       AuditResolver,

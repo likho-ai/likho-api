@@ -13,6 +13,7 @@ import {
   type Dimension,
   type Metric,
 } from '@likho-ai/contracts/analytics/v1/analytics_pb';
+import { DialerService } from '@likho-ai/contracts/dialer/v1/dialer_pb';
 import { InsightsSchema, InsightsService } from '@likho-ai/contracts/insights/v1/insights_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
@@ -524,6 +525,149 @@ export class FakeAnalytics {
               negative: 0n,
             },
           ],
+        };
+      },
+    });
+  }
+}
+
+/** The dialer connector: what the dialer knows about its calls, from made-up calls, and its status. */
+export class FakeDialer {
+  calls: {
+    crtObjectId: string;
+    callId: string;
+    callTime: string;
+    campaign: string;
+    agent: string;
+    agentId: string;
+    connected: boolean;
+    talkSeconds: number;
+  }[] = [];
+  asked: {
+    method: string;
+    since?: Date;
+    until?: Date;
+    campaign?: string;
+    agent?: string;
+    after?: string;
+    limit?: number;
+  }[] = [];
+  down = false;
+
+  routes(router: ConnectRouter) {
+    const guard = () => {
+      if (this.down) throw new ConnectError('connector down', Code.Unavailable);
+    };
+    const inWindow = (w?: {
+      since?: { seconds: bigint; nanos: number };
+      until?: { seconds: bigint; nanos: number };
+    }) => {
+      const since = w?.since ? timestampDate(w.since as never) : new Date(0);
+      const until = w?.until ? timestampDate(w.until as never) : new Date(8.64e15);
+      return {
+        since,
+        until,
+        calls: this.calls.filter((c) => new Date(c.callTime) >= since && new Date(c.callTime) < until),
+      };
+    };
+    const group = (calls: FakeDialer['calls'], key: (c: FakeDialer['calls'][number]) => string) => {
+      const by = new Map<string, FakeDialer['calls']>();
+      for (const c of calls) by.set(key(c), [...(by.get(key(c)) ?? []), c]);
+      return [...by.entries()].sort((a, b) => b[1].length - a[1].length);
+    };
+    router.service(DialerService, {
+      listCampaigns: (req) => {
+        guard();
+        const { since, until, calls } = inWindow(req.window);
+        this.asked.push({ method: 'campaigns', since, until });
+        return {
+          campaigns: group(calls, (c) => c.campaign).map(([name, cs]) => ({
+            name,
+            calls: BigInt(cs.length),
+            connected: BigInt(cs.filter((c) => c.connected).length),
+            interactions: BigInt(new Set(cs.map((c) => c.crtObjectId)).size),
+            talkSeconds: BigInt(cs.reduce((a, c) => a + c.talkSeconds, 0)),
+          })),
+        };
+      },
+      listAgents: (req) => {
+        guard();
+        const { since, until, calls } = inWindow(req.window);
+        this.asked.push({ method: 'agents', since, until, campaign: req.campaign });
+        const mine = calls.filter((c) => !req.campaign || c.campaign === req.campaign);
+        return {
+          agents: group(mine, (c) => c.agent).map(([name, cs]) => ({
+            id: cs[0]!.agentId,
+            name,
+            calls: BigInt(cs.length),
+            connected: BigInt(cs.filter((c) => c.connected).length),
+            talkSeconds: BigInt(cs.reduce((a, c) => a + c.talkSeconds, 0)),
+          })),
+        };
+      },
+      listCalls: (req) => {
+        guard();
+        const { since, until, calls } = inWindow(req.window);
+        this.asked.push({
+          method: 'calls',
+          since,
+          until,
+          campaign: req.campaign,
+          agent: req.agent,
+          after: req.after,
+          limit: req.limit,
+        });
+        const all = calls
+          .filter(
+            (c) => (!req.campaign || c.campaign === req.campaign) && (!req.agent || c.agent === req.agent),
+          )
+          .filter((c) => (!req.connectedOnly || c.connected) && c.talkSeconds >= req.minTalkSeconds)
+          .sort((a, b) => b.callTime.localeCompare(a.callTime));
+        const start = req.after ? Number(req.after) : 0;
+        const page = all.slice(start, start + (req.limit || 50));
+        return {
+          calls: page.map((c) => ({
+            ...c,
+            callType: 'inbound.call.dial',
+            disposition: 'Sale',
+            phone: '…1234',
+            hangupBy: 'customer',
+            queue: '',
+            transferredCampaign: '',
+          })),
+          nextCursor: start + page.length < all.length ? String(start + page.length) : '',
+        };
+      },
+      getCall: (req) => {
+        guard();
+        const c = this.calls.find((x) => x.crtObjectId === req.crtObjectId);
+        if (!c) throw new ConnectError('no such call', Code.NotFound);
+        return {
+          call: {
+            ...c,
+            callType: 'inbound.call.dial',
+            disposition: 'Sale',
+            phone: '…1234',
+            hangupBy: 'customer',
+            queue: '',
+            transferredCampaign: '',
+          },
+        };
+      },
+      getStatus: () => {
+        guard();
+        return {
+          databaseConfigured: true,
+          scheduleEnabled: false,
+          cursor: '2026-10-02 10:00:00',
+          importedToday: 3,
+          dailyLimit: 200,
+          campaigns: [],
+          minTalkSeconds: 20,
+          writebackEnabled: false,
+          archiveEnabled: true,
+          version: '0.4.0',
+          lastRunSummary: '',
         };
       },
     });

@@ -16,6 +16,7 @@ import { Config, loadConfig } from '../src/config/config.js';
 import { MailService } from '../src/mail/mail.service.js';
 import {
   FakeAnalytics,
+  FakeDialer,
   FakeInsights,
   FakeLanguage,
   FakeMedia,
@@ -37,6 +38,7 @@ export interface Harness {
   search: FakeSearch;
   insights: FakeInsights;
   analytics: FakeAnalytics;
+  dialer: FakeDialer;
   /** The mails the service "sent" (SMTP_URL=memory:). */
   mail: MailService;
   nats: NatsConnection;
@@ -102,6 +104,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
   const search = new FakeSearch();
   const insights = new FakeInsights();
   const analytics = new FakeAnalytics();
+  const dialer = new FakeDialer();
   const servers: FakeServer[] = await Promise.all([
     serve((r) => media.routes(r)),
     serve((r) => transcription.routes(r)),
@@ -109,6 +112,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     serve((r) => search.routes(r)),
     serve((r) => insights.routes(r)),
     serve((r) => analytics.routes(r)),
+    serve((r) => dialer.routes(r)),
   ]);
 
   const config: Config = {
@@ -122,6 +126,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     SEARCH_GRPC_ADDR: servers[3]!.address,
     INSIGHTS_GRPC_ADDR: servers[4]!.address,
     ANALYTICS_GRPC_ADDR: servers[5]!.address,
+    DIALER_GRPC_ADDR: servers[6]!.address,
     CONSUMER_GROUP: schema,
     CONSUMER_START: 'new', // the local stream keeps weeks of events; a test group has no use for them
     SMTP_URL: 'memory:',
@@ -160,6 +165,7 @@ export async function start(overrides: Partial<Config> = {}): Promise<Harness> {
     search,
     insights,
     analytics,
+    dialer,
     mail: app.get(MailService),
     nats,
     js,

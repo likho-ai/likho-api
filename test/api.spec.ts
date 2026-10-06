@@ -297,7 +297,7 @@ describe.skipIf(!stackUp)('likho-api', () => {
     });
 
     it('jobs can be started by hand and cancelled', async () => {
-      await admin.ok(`mutation { updateSettings(autoTranscribe: false) { autoTranscribe } }`);
+      await admin.ok(`mutation { updateSettings(input: { autoTranscribe: false }) { autoTranscribe } }`);
       try {
         const recording = await readyRecording(admin, 'manual.mp3', 'ready');
         expect(recording.status).toBe('ready');
@@ -322,7 +322,7 @@ describe.skipIf(!stackUp)('likho-api', () => {
         const { recording: r } = await admin.ok(GET_RECORDING, { id: recording.id });
         expect(r.status).toBe('ready');
       } finally {
-        await admin.ok(`mutation { updateSettings(autoTranscribe: true) { autoTranscribe } }`);
+        await admin.ok(`mutation { updateSettings(input: { autoTranscribe: true }) { autoTranscribe } }`);
       }
     });
 
@@ -725,10 +725,10 @@ describe.skipIf(!stackUp)('likho-api', () => {
     }
 
     beforeAll(async () => {
-      await admin.ok(`mutation { updateSettings(autoTranscribe: false) { autoTranscribe } }`);
+      await admin.ok(`mutation { updateSettings(input: { autoTranscribe: false }) { autoTranscribe } }`);
     });
     afterAll(async () => {
-      await admin.ok(`mutation { updateSettings(autoTranscribe: true) { autoTranscribe } }`);
+      await admin.ok(`mutation { updateSettings(input: { autoTranscribe: true }) { autoTranscribe } }`);
     });
 
     it('a job nobody took is asked for again, then failed', async () => {
@@ -780,8 +780,11 @@ describe.skipIf(!stackUp)('likho-api', () => {
       }, 'the job to be running');
       // ...but a worker has it now: nothing for the sweeper to do.
       expect(await sweep()).toEqual({ requeued: 0, failed: 0 });
-      const { recording: mid } = await admin.ok(GET_RECORDING, { id: recording.id });
-      expect(mid.status).toBe('transcribing');
+      // The recording follows the job a moment later (a write of its own).
+      const mid = await until(async () => {
+        const { recording: r } = await admin.ok(GET_RECORDING, { id: recording.id });
+        return r.status === 'transcribing' ? r : null;
+      }, 'the recording to be transcribing');
       expect(mid.jobs[0]).toMatchObject({ status: 'running', totalSeconds: 61.5 }); // the length stays known
       await admin.ok(`mutation ($id: String!) { cancelJob(id: $id) { status } }`, { id: createJob.id });
     });
@@ -1526,6 +1529,236 @@ describe.skipIf(!stackUp)('likho-api', () => {
     });
   });
 
+  /** A member of the workspace, signed in through an invitation (made once). */
+  let memberSession: Browser | null = null;
+  const signInMember = async (): Promise<Browser> => {
+    if (memberSession) return memberSession;
+    const email = `member-${Date.now()}@example.test`;
+    const { inviteUser } = await admin.ok(
+      `mutation ($email: String!) { inviteUser(input: { email: $email, name: "Mem", role: member }) { link } }`,
+      { email },
+    );
+    const browser = new Browser(h.url);
+    await browser.ok(
+      `mutation ($token: String!) { acceptInvitation(token: $token, name: "Mem Ber", password: "member-password-1") { id } }`,
+      { token: inviteUser.link.split('/').pop() },
+    );
+    memberSession = browser;
+    return browser;
+  };
+
+  describe('the workspace’s settings', () => {
+    it('reads every setting with the defaults, changes a few, checks them, tells the bus and the audit log', async () => {
+      const member = await signInMember();
+      const { settings } = await member.ok(
+        `{ settings { autoTranscribe dialer { scheduleEnabled campaigns minTalkSeconds dailyLimit batchLimit pollIntervalSeconds phoneDigits writebackEnabled } } }`,
+      );
+      expect(settings.dialer).toMatchObject({
+        scheduleEnabled: false,
+        campaigns: [],
+        minTalkSeconds: 20,
+        dailyLimit: 200,
+        phoneDigits: 4,
+      });
+
+      const { updateSettings } = await admin.ok(
+        `mutation ($input: SettingsInput!) { updateSettings(input: $input) { autoTranscribe dialer { scheduleEnabled campaigns dailyLimit minTalkSeconds } } }`,
+        {
+          input: {
+            dialer: { scheduleEnabled: true, campaigns: [' Sales ', 'Support', 'Sales'], dailyLimit: 500 },
+          },
+        },
+      );
+      expect(updateSettings.dialer).toEqual({
+        scheduleEnabled: true,
+        campaigns: ['Sales', 'Support'],
+        dailyLimit: 500,
+        minTalkSeconds: 20,
+      });
+      const told = await until(
+        async () =>
+          h.published('likho.settings.changed').find((e) => e.data.keys.includes('dialer.daily_limit'))!,
+        'the settings to be told on the bus',
+      );
+      expect(told.data.keys.sort()).toEqual([
+        'dialer.campaigns',
+        'dialer.daily_limit',
+        'dialer.schedule_enabled',
+      ]);
+
+      // A connector reads them with its key.
+      const { createApiKey } = await admin.ok(
+        `mutation { createApiKey(name: "dialer connector 2") { key } }`,
+      );
+      const rest = await (
+        await fetch(`${h.url}/api/v1/settings`, { headers: { authorization: `Bearer ${createApiKey.key}` } })
+      ).json();
+      expect(rest.dialer).toMatchObject({
+        scheduleEnabled: true,
+        campaigns: ['Sales', 'Support'],
+        dailyLimit: 500,
+      });
+
+      // Out of bounds, or not an admin: refused.
+      expect(
+        await admin.fails(
+          `mutation { updateSettings(input: { dialer: { dailyLimit: 0 } }) { autoTranscribe } }`,
+        ),
+      ).toBe('invalid');
+      expect(
+        await member.fails(
+          `mutation { updateSettings(input: { autoTranscribe: false }) { autoTranscribe } }`,
+        ),
+      ).toBe('forbidden');
+
+      // Nothing changed: no event, no audit entry.
+      const before = h.published('likho.settings.changed').length;
+      await admin.ok(
+        `mutation { updateSettings(input: { dialer: { dailyLimit: 500 } }) { autoTranscribe } }`,
+      );
+      expect(h.published('likho.settings.changed').length).toBe(before);
+
+      await admin.ok(
+        `mutation { updateSettings(input: { dialer: { scheduleEnabled: false, campaigns: [], dailyLimit: 200 } }) { autoTranscribe } }`,
+      );
+    });
+  });
+
+  describe('the dialer’s calls', () => {
+    const since = '2026-10-02T00:00:00.000Z';
+    const until2 = '2026-10-03T00:00:00.000Z';
+
+    it('lists the campaigns, the agents and the calls of a window, and marks the calls Likho has', async () => {
+      const member = await signInMember();
+      const crt = `crt-${Date.now()}`;
+      h.dialer.calls = [
+        {
+          crtObjectId: crt,
+          callId: 'c1',
+          callTime: '2026-10-02T05:00:00.000Z',
+          campaign: 'Sales',
+          agent: 'asha',
+          agentId: 'u1',
+          connected: true,
+          talkSeconds: 120,
+        },
+        {
+          crtObjectId: `${crt}-2`,
+          callId: 'c2',
+          callTime: '2026-10-02T06:00:00.000Z',
+          campaign: 'Sales',
+          agent: 'ravi',
+          agentId: 'u2',
+          connected: true,
+          talkSeconds: 40,
+        },
+        {
+          crtObjectId: `${crt}-3`,
+          callId: 'c3',
+          callTime: '2026-10-02T07:00:00.000Z',
+          campaign: 'Support',
+          agent: 'asha',
+          agentId: 'u1',
+          connected: false,
+          talkSeconds: 0,
+        },
+      ];
+      await admin.ok(REQUEST_UPLOAD, { input: { originalName: 'had.mp3', sizeBytes: 10, externalId: crt } });
+
+      const { dialerCampaigns } = await member.ok(
+        `query ($s: DateTime!, $u: DateTime!) { dialerCampaigns(since: $s, until: $u) { name calls connected interactions talkSeconds } }`,
+        { s: since, u: until2 },
+      );
+      expect(dialerCampaigns).toEqual([
+        { name: 'Sales', calls: 2, connected: 2, interactions: 2, talkSeconds: 160 },
+        { name: 'Support', calls: 1, connected: 0, interactions: 1, talkSeconds: 0 },
+      ]);
+      const { dialerAgents } = await member.ok(
+        `query ($s: DateTime!, $u: DateTime!) { dialerAgents(since: $s, until: $u, campaign: "Sales") { id name calls } }`,
+        { s: since, u: until2 },
+      );
+      expect(dialerAgents.map((a: { name: string }) => a.name).sort()).toEqual(['asha', 'ravi']);
+
+      const { dialerCalls } = await member.ok(
+        `query ($f: DialerCallsFilter!) { dialerCalls(filter: $f, first: 1) { items { crtObjectId agent talkSeconds recordingId recordingStatus } nextCursor } }`,
+        { f: { since, until: until2, campaign: 'Sales' } },
+      );
+      expect(dialerCalls.items).toEqual([
+        { crtObjectId: `${crt}-2`, agent: 'ravi', talkSeconds: 40, recordingId: null, recordingStatus: null },
+      ]);
+      expect(dialerCalls.nextCursor).toBe('1');
+      const next = await member.ok(
+        `query ($f: DialerCallsFilter!, $a: String) { dialerCalls(filter: $f, first: 1, after: $a) { items { crtObjectId recordingId recordingStatus } nextCursor } }`,
+        { f: { since, until: until2, campaign: 'Sales' }, a: '1' },
+      );
+      expect(next.dialerCalls.items[0].crtObjectId).toBe(crt);
+      expect(next.dialerCalls.items[0].recordingId).toMatch(/^rec_/);
+      expect(next.dialerCalls.nextCursor).toBeNull();
+
+      // Over REST, with connectedOnly=false the call that did not connect is there too.
+      const rest = await (
+        await fetch(`${h.url}/api/v1/dialer/calls?since=${since}&until=${until2}&connectedOnly=false`, {
+          headers: { cookie: member.cookie },
+        })
+      ).json();
+      expect(rest.items).toHaveLength(3);
+      const status = await member.ok(
+        `{ dialerStatus { databaseConfigured importedToday dailyLimit version archiveEnabled } }`,
+      );
+      expect(status.dialerStatus).toEqual({
+        databaseConfigured: true,
+        importedToday: 3,
+        dailyLimit: 200,
+        version: '0.4.0',
+        archiveEnabled: true,
+      });
+
+      // Several calls fetched at once.
+      const { requestImports } = await member.ok(
+        `mutation ($ids: [String!]!) { requestImports(externalIds: $ids) { id externalId status } }`,
+        { ids: [`${crt}-2`, `${crt}-3`, `${crt}-2`] },
+      );
+      expect(requestImports.map((i: { externalId: string }) => i.externalId)).toEqual([
+        `${crt}-2`,
+        `${crt}-3`,
+      ]);
+
+      // A window the wrong way round is refused here; a connector that does not answer says so.
+      expect(
+        await member.fails(
+          `{ dialerCampaigns(since: "2026-10-03T00:00:00Z", until: "2026-10-02T00:00:00Z") { name } }`,
+        ),
+      ).toBe('invalid');
+      h.dialer.down = true;
+      expect(await member.fails(`{ dialerStatus { version } }`)).toBe('service_unavailable');
+      h.dialer.down = false;
+    });
+
+    it('an admin sees whether every service answers', async () => {
+      const member = await signInMember();
+      const { systemStatus } = await admin.ok(`{ systemStatus { version services { name ok detail } } }`);
+      const byName = Object.fromEntries(systemStatus.services.map((s: { name: string }) => [s.name, s]));
+      expect(Object.keys(byName).sort()).toEqual([
+        'likho-analytics',
+        'likho-connector-ameyo',
+        'likho-insights',
+        'likho-language',
+        'likho-media',
+        'likho-search',
+        'likho-transcription',
+      ]);
+      expect(byName['likho-connector-ameyo'].ok).toBe(true);
+      expect(byName['likho-connector-ameyo'].detail).toContain('0.4.0');
+      h.dialer.down = true;
+      const again = await admin.ok(`{ systemStatus { services { name ok } } }`);
+      expect(
+        again.systemStatus.services.find((s: { name: string }) => s.name === 'likho-connector-ameyo').ok,
+      ).toBe(false);
+      h.dialer.down = false;
+      expect(await member.fails(`{ systemStatus { version } }`)).toBe('forbidden');
+    });
+  });
+
   describe('a token for another system’s browser', () => {
     it('an API key exchanges itself for a short-lived viewer token; a portal reads the transcript with it', async () => {
       const { createApiKey } = await admin.ok(`mutation { createApiKey(name: "reports portal") { id key } }`);
@@ -1777,7 +2010,9 @@ describe.skipIf(!stackUp)('likho-api', () => {
         { originalName: 'd000-0a1b2c3d-vce-0007.mp3', source: 'ameyo' },
         { originalName: 'from-script.mp3', source: 'api' },
       ]);
-      const accepted = auditLog.items.find((e: any) => e.action === 'invitation.accepted');
+      const accepted = auditLog.items.find(
+        (e: any) => e.action === 'invitation.accepted' && e.actorName === 'Vee Viewer',
+      );
       expect(accepted.actorName).toBe('Vee Viewer'); // the new person, acting for themselves
       expect(accepted.targetId).toBe(accepted.actorId);
 
