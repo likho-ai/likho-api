@@ -28,6 +28,9 @@ import { ImportsService } from './imports/imports.service.js';
 import { InsightsController } from './insights/insights.controller.js';
 import { InsightsResolver } from './insights/insights.resolver.js';
 import { InsightsService } from './insights/insights.service.js';
+import { MlController } from './ml/ml.controller.js';
+import { MlResolver } from './ml/ml.resolver.js';
+import { MlService } from './ml/ml.service.js';
 import { LiveController } from './live/live.controller.js';
 import { LiveModule } from './live/live.module.js';
 import { MetricsModule } from './metrics/metrics.module.js';
@@ -102,6 +105,7 @@ export function appModule(config?: Config) {
       VocabularyController,
       InsightsController,
       AnalyticsController,
+      MlController,
       DialerController,
       SettingsController,
       TokensController,
@@ -115,6 +119,7 @@ export function appModule(config?: Config) {
       VocabularyService,
       InsightsService,
       AnalyticsService,
+      MlService,
       DialerService,
       SettingsService,
       SystemService,
@@ -128,6 +133,7 @@ export function appModule(config?: Config) {
       VocabularyResolver,
       InsightsResolver,
       AnalyticsResolver,
+      MlResolver,
       DialerResolver,
       SystemResolver,
       SettingsResolver,
