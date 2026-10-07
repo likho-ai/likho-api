@@ -17,6 +17,14 @@ import { DialerService } from '@likho-ai/contracts/dialer/v1/dialer_pb';
 import { InsightsSchema, InsightsService } from '@likho-ai/contracts/insights/v1/insights_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaKind, MediaService, MediaStatus } from '@likho-ai/contracts/media/v1/media_pb';
+import {
+  EvaluationSchema,
+  EvaluationStatus,
+  GoldItemSchema,
+  MlService,
+  ModelSchema,
+  ModelStatus,
+} from '@likho-ai/contracts/ml/v1/ml_pb';
 import { HitSchema, SearchService, type Hit } from '@likho-ai/contracts/search/v1/search_pb';
 import {
   Layer,
@@ -437,6 +445,160 @@ export class FakeInsights {
         model: this.enabled ? 'fake/one' : '',
         formVersion: 'example-1',
       }),
+    });
+  }
+}
+
+/** likho-ml: a registry with two models, a gold set and evaluations, all in memory. */
+export class FakeMl {
+  models = [
+    {
+      id: 'mdl_turbo',
+      registryId: 'faster-whisper/turbo',
+      engine: 'faster-whisper',
+      name: 'turbo',
+      isDefault: true,
+    },
+    {
+      id: 'mdl_large',
+      registryId: 'faster-whisper/large-v3',
+      engine: 'faster-whisper',
+      name: 'large-v3',
+      isDefault: false,
+    },
+  ];
+  gold = new Map<string, Record<string, any>>();
+  evaluations = new Map<string, Record<string, any>>();
+  /** What AddToGoldSet was given (the media id and transcript only likho-api knows). */
+  added: {
+    workspaceId: string;
+    recordingId: string;
+    transcriptId: string;
+    mediaId: string;
+    userId: string;
+  }[] = [];
+
+  private model(id: string) {
+    const found = this.models.find((m) => m.id === id);
+    if (!found) throw new ConnectError(`No model ${id}.`, Code.NotFound);
+    return found;
+  }
+
+  private modelPb(m: (typeof this.models)[number]) {
+    const scored = [...this.evaluations.values()]
+      .filter((e) => e.modelId === m.id && e.status === EvaluationStatus.COMPLETED)
+      .at(-1);
+    return create(ModelSchema, {
+      ...m,
+      status: ModelStatus.AVAILABLE,
+      latestEvaluationId: scored?.id ?? '',
+      latestScores: scored?.scores,
+    });
+  }
+
+  routes(router: ConnectRouter) {
+    router.service(MlService, {
+      listModels: () => ({ models: this.models.map((m) => this.modelPb(m)) }),
+      setDefault: (req) => {
+        const chosen = this.model(req.modelId);
+        for (const m of this.models) m.isDefault = m === chosen;
+        return { model: this.modelPb(chosen) };
+      },
+      registerModel: (req) => {
+        if (this.models.some((m) => m.registryId === req.registryId))
+          throw new ConnectError(`${req.registryId} is registered already.`, Code.AlreadyExists);
+        const [engine, name] = req.registryId.split('/');
+        const m = {
+          id: newId('mdl'),
+          registryId: req.registryId,
+          engine: engine!,
+          name: name!,
+          isDefault: false,
+        };
+        this.models.push(m);
+        return { model: this.modelPb(m) };
+      },
+      addToGoldSet: (req) => {
+        this.added.push({
+          workspaceId: req.workspaceId,
+          recordingId: req.recordingId,
+          transcriptId: req.transcriptId,
+          mediaId: req.mediaId,
+          userId: req.userId,
+        });
+        const item = {
+          id: newId('gld'),
+          workspaceId: req.workspaceId,
+          recordingId: req.recordingId,
+          transcriptId: req.transcriptId,
+          transcriptVersion: 2,
+          language: 'hi',
+          audioSeconds: 61.5,
+          lines: 2,
+          mediaId: req.mediaId,
+          addedBy: req.userId,
+          addedAt: timestampFromDate(new Date()),
+        };
+        this.gold.set(`${req.workspaceId}/${req.recordingId}`, item);
+        return { item: create(GoldItemSchema, item) };
+      },
+      removeFromGoldSet: (req) => {
+        this.gold.delete(`${req.workspaceId}/${req.recordingId}`);
+        return {};
+      },
+      listGoldSet: (req) => {
+        const items = [...this.gold.values()].filter((i) => i.workspaceId === req.workspaceId);
+        return {
+          items: items.map((i) => create(GoldItemSchema, i)),
+          audioSeconds: items.reduce((s, i) => s + i.audioSeconds, 0),
+        };
+      },
+      startEvaluation: (req) => {
+        const m = this.model(req.modelId);
+        const items = [...this.gold.values()].filter((i) => i.workspaceId === req.workspaceId);
+        // Answers queued, as likho-ml does; the test finishes it with complete().
+        const e = {
+          id: newId('evl'),
+          workspaceId: req.workspaceId,
+          modelId: m.id,
+          registryId: m.registryId,
+          status: EvaluationStatus.QUEUED,
+          itemsTotal: items.length,
+          startedBy: req.userId,
+          createdAt: timestampFromDate(new Date()),
+        };
+        this.evaluations.set(e.id, e);
+        return { evaluation: create(EvaluationSchema, e) };
+      },
+      getEvaluation: (req) => {
+        const e = this.evaluations.get(req.evaluationId);
+        if (!e) throw new ConnectError(`No evaluation ${req.evaluationId}.`, Code.NotFound);
+        return { evaluation: create(EvaluationSchema, e) };
+      },
+      listEvaluations: (req) => ({
+        evaluations: [...this.evaluations.values()]
+          .filter((e) => e.workspaceId === req.workspaceId && (!req.modelId || e.modelId === req.modelId))
+          .map((e) => create(EvaluationSchema, e)),
+      }),
+      getTrainingStats: () => ({
+        examples: 12,
+        scriptExamples: 5,
+        romanExamples: 7,
+        recordings: 3,
+        audioSeconds: 41.5,
+      }),
+    });
+  }
+
+  /** What likho-ml does when the evaluation's transcriptions are scored. */
+  complete(evaluationId: string, wer: number) {
+    const e = this.evaluations.get(evaluationId)!;
+    Object.assign(e, {
+      status: EvaluationStatus.COMPLETED,
+      itemsDone: e.itemsTotal,
+      scores: { werScript: wer, cerScript: wer / 2, werRoman: wer, cerRoman: wer / 2 },
+      items: [{ recordingId: 'rec_x', scores: { werScript: wer }, words: 9, audioSeconds: 61.5, error: '' }],
+      finishedAt: timestampFromDate(new Date()),
     });
   }
 }
