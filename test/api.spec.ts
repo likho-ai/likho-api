@@ -1555,6 +1555,122 @@ describe.skipIf(!stackUp)('likho-api', () => {
     return browser;
   };
 
+  describe('speech models, the gold set and evaluations (likho-ml)', () => {
+    const MODELS = `{ speechModels { id registryId isDefault status latestScores { werScript werRoman } latestEvaluationId } }`;
+
+    /** A recording whose transcript is done (its latest transcript is the one a gold set takes). */
+    async function transcribed(name: string) {
+      const recording = await readyRecording(admin, name);
+      const workspaceId = h.media.uploads.at(-1)!.workspaceId;
+      const transcript = h.transcription.add(newId('trn'), recording.id, recording.jobs[0].id);
+      await h.publish('likho.transcription.completed', 'likho.transcription.completed.v1', {
+        job_id: recording.jobs[0].id,
+        recording_id: recording.id,
+        transcript_id: transcript.id,
+        workspace_id: workspaceId,
+        version: 1,
+        language: { detected: 'hi', probability: 0.9, candidates: [], decoded_as: 'hi', policy: 'auto' },
+        stats: {
+          audio_seconds: 61.5,
+          elapsed_seconds: 40,
+          segments: 2,
+          chunks: 6,
+          silence_skipped_seconds: 3,
+        },
+      });
+      await until(async () => {
+        const { recording: r } = await admin.ok(GET_RECORDING, { id: recording.id });
+        return r.status === 'done' ? r : null;
+      }, `the transcript of ${name}`);
+      return { recording, transcript, workspaceId };
+    }
+
+    it('a member reads the models; only an admin chooses the default, and it is audited', async () => {
+      const member = await signInMember();
+      const { speechModels } = await member.ok(MODELS);
+      expect(speechModels.map((m: any) => [m.registryId, m.isDefault])).toEqual([
+        ['faster-whisper/turbo', true],
+        ['faster-whisper/large-v3', false],
+      ]);
+      expect(speechModels[0].latestScores).toBeNull();
+
+      const CHOOSE = `mutation ($id: String!) { setDefaultSpeechModel(id: $id) { registryId isDefault } }`;
+      expect(await member.fails(CHOOSE, { id: 'mdl_large' })).toBe('forbidden');
+      const { setDefaultSpeechModel } = await admin.ok(CHOOSE, { id: 'mdl_large' });
+      expect(setDefaultSpeechModel).toEqual({ registryId: 'faster-whisper/large-v3', isDefault: true });
+      const { auditLog } = await admin.ok(`{ auditLog { items { action targetKind targetId details } } }`);
+      expect(auditLog.items.find((e: any) => e.action === 'model.chosen')).toMatchObject({
+        targetKind: 'model',
+        targetId: 'mdl_large',
+      });
+      await admin.ok(CHOOSE, { id: 'mdl_turbo' });
+
+      expect(
+        await admin.fails(
+          `mutation { registerSpeechModel(input: { registryId: "faster-whisper/turbo" }) { id } }`,
+        ),
+      ).toBe('invalid');
+    });
+
+    it('a corrected call joins the gold set with its audio and latest transcript; a model is evaluated', async () => {
+      const { recording, transcript, workspaceId } = await transcribed('gold.mp3');
+      const { addToGoldSet } = await admin.ok(
+        `mutation ($id: String!) { addToGoldSet(recordingId: $id) { recordingId transcriptId transcriptVersion audioSeconds } }`,
+        { id: recording.id },
+      );
+      expect(addToGoldSet).toMatchObject({ recordingId: recording.id, transcriptId: transcript.id });
+      // What only likho-api knows went along: the recording's audio and the workspace.
+      expect(h.ml.added.at(-1)).toMatchObject({
+        workspaceId,
+        recordingId: recording.id,
+        mediaId: recording.mediaId,
+      });
+
+      const member = await signInMember();
+      expect(
+        (await member.ok(`{ goldSet { items { recordingId } audioSeconds } }`)).goldSet.items,
+      ).toHaveLength(1);
+      expect(
+        await member.fails(`mutation ($id: String!) { startEvaluation(modelId: $id) { id } }`, {
+          id: 'mdl_large',
+        }),
+      ).toBe('forbidden');
+
+      const { startEvaluation } = await admin.ok(
+        `mutation ($id: String!) { startEvaluation(modelId: $id) { id status itemsTotal registryId } }`,
+        { id: 'mdl_large' },
+      );
+      expect(startEvaluation).toMatchObject({
+        status: 'queued',
+        itemsTotal: 1,
+        registryId: 'faster-whisper/large-v3',
+      });
+      h.ml.complete(startEvaluation.id, 0.2);
+      const { evaluation } = await member.ok(
+        `query ($id: String!) { evaluation(id: $id) { status scores { werScript cerRoman } items { recordingId words } } }`,
+        { id: startEvaluation.id },
+      );
+      expect(evaluation).toMatchObject({ status: 'completed', scores: { werScript: 0.2, cerRoman: 0.1 } });
+      expect(evaluation.items[0].words).toBe(9);
+      const large = (await admin.ok(MODELS)).speechModels.find((m: any) => m.id === 'mdl_large');
+      expect(large).toMatchObject({
+        latestEvaluationId: startEvaluation.id,
+        latestScores: { werScript: 0.2 },
+      });
+
+      // Another workspace's evaluation is not found from this one.
+      h.ml.evaluations.get(startEvaluation.id)!.workspaceId = 'wsp_someone_else';
+      expect(
+        await admin.fails(`query ($id: String!) { evaluation(id: $id) { id } }`, { id: startEvaluation.id }),
+      ).toBe('not_found');
+
+      await admin.ok(`mutation ($id: String!) { removeFromGoldSet(recordingId: $id) }`, { id: recording.id });
+      expect((await admin.ok(`{ goldSet { items { recordingId } } }`)).goldSet.items).toHaveLength(0);
+      const { trainingStats } = await member.ok(`{ trainingStats { examples recordings audioSeconds } }`);
+      expect(trainingStats).toEqual({ examples: 12, recordings: 3, audioSeconds: 41.5 });
+    });
+  });
+
   describe('the workspace’s settings', () => {
     it('reads every setting with the defaults, changes a few, checks them, tells the bus and the audit log', async () => {
       const member = await signInMember();
