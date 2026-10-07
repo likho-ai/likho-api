@@ -366,6 +366,55 @@ type Engine {
   registryId: String!
 }
 
+"""
+Error rates (0 = perfect): word and character, of the script layer and of the roman (Hinglish) layer, where spelling variants are forgiven.
+"""
+type ErrorRates {
+  cerRoman: Float!
+  cerScript: Float!
+  werRoman: Float!
+  werScript: Float!
+}
+
+"""A model scored on the gold set."""
+type Evaluation {
+  audioSeconds: Float!
+  createdAt: DateTime
+  error: String!
+  finishedAt: DateTime
+  id: String!
+  items: [EvaluationItem!]!
+  itemsDone: Int!
+  itemsTotal: Int!
+  modelId: String!
+
+  """Audio seconds transcribed per second of wall-clock time."""
+  realtimeFactor: Float!
+  registryId: String!
+
+  """Over all recordings, weighted by their length."""
+  scores: ErrorRates!
+  startedBy: String!
+
+  """queued, running, completed or failed."""
+  status: String!
+}
+
+"""
+One gold recording of an evaluation, transcribed by the model and scored.
+"""
+type EvaluationItem {
+  audioSeconds: Float!
+
+  """Why this recording could not be scored; empty when it was."""
+  error: String!
+  recordingId: String!
+  scores: ErrorRates!
+
+  """Reference words."""
+  words: Int!
+}
+
 """One value of a fact about the calls, and how many recordings have it."""
 type FacetValue {
   count: Int!
@@ -397,6 +446,26 @@ input GlossaryTermInput {
   language: String
   note: String
   term: String!
+}
+
+"""
+A recording of the gold set: its corrected transcript is the reference.
+"""
+type GoldItem {
+  addedAt: DateTime
+  addedBy: String!
+  audioSeconds: Float!
+  language: String!
+  lines: Int!
+  recordingId: String!
+  transcriptId: String!
+  transcriptVersion: Int!
+}
+
+"""The workspace’s gold set."""
+type GoldSet {
+  audioSeconds: Float!
+  items: [GoldItem!]!
 }
 
 type Import {
@@ -606,6 +675,11 @@ type Mutation {
   acceptInvitation(name: String!, password: String!, token: String!): Me!
 
   """
+  Adds a recording to the gold set; its latest transcript (checked line by line) is the reference.
+  """
+  addToGoldSet(recordingId: String!): GoldItem!
+
+  """
   Analyses the recording’s latest transcript now and answers with its insights; with force, again even when it has some.
   """
   analyseRecording(force: Boolean, id: String!): Insights!
@@ -662,6 +736,10 @@ type Mutation {
   """Ends the session and clears the cookie."""
   logout: Boolean!
 
+  """Adds a model to the registry (a fine-tuned one, or another size)."""
+  registerSpeechModel(input: RegisterSpeechModelInput!): SpeechModel!
+  removeFromGoldSet(recordingId: String!): Boolean!
+
   """
   Asks the dialer connector for a call by its id; the recording appears when it arrives.
   """
@@ -685,6 +763,9 @@ type Mutation {
   """Chooses a new password through a reset link, and signs in."""
   resetPassword(password: String!, token: String!): Me!
 
+  """Retires a model: kept for history, never the default."""
+  retireSpeechModel(id: String!): SpeechModel!
+
   """
   A new version whose Hinglish is rebuilt with the current spellings. The speech model does not run.
   """
@@ -697,10 +778,18 @@ type Mutation {
   """Keeps a search (the words and the filter) for later."""
   saveSearch(input: SaveSearchInput!): SavedSearch!
 
+  """Makes a model the one new transcriptions use."""
+  setDefaultSpeechModel(id: String!): SpeechModel!
+
   """
   Changes what a person may do. You cannot take your own admin role away.
   """
   setUserRole(role: Role!, userId: String!): User!
+
+  """
+  Scores a model on the gold set; answers at once (queued), the scores follow.
+  """
+  startEvaluation(modelId: String!): Evaluation!
 
   """Changes the settings given; the rest keep their values."""
   updateSettings(input: SettingsInput!): Settings!
@@ -771,12 +860,23 @@ type Query {
 
   """The speech models a worker can run."""
   engines: [Engine!]!
+
+  """One evaluation, with each recording’s scores."""
+  evaluation(id: String!): Evaluation!
+
+  """The workspace’s evaluations, newest first (without their recordings)."""
+  evaluations(first: Int, modelId: String): [Evaluation!]!
   glossary: [GlossaryTerm!]!
 
   """
   The glossary as CSV: term, language, enabled, note, heard, last_heard_at.
   """
   glossaryCsv: String!
+
+  """
+  The workspace’s gold set: recordings whose transcript is the reference.
+  """
+  goldSet: GoldSet!
   import(id: String!): Import!
 
   """Calls asked for from the dialer, newest first."""
@@ -825,6 +925,9 @@ type Query {
 
   """Every setting of the workspace, the defaults filled in."""
   settings: Settings!
+
+  """The speech models, the default first, with their latest scores."""
+  speechModels(includeRetired: Boolean): [SpeechModel!]!
   spellings: [Spelling!]!
 
   """
@@ -834,6 +937,9 @@ type Query {
 
   """Whether every service of the platform answers right now."""
   systemStatus: SystemStatus!
+
+  """What people’s corrections have given as training data."""
+  trainingStats: TrainingStats!
 
   """One transcript with every line, both layers."""
   transcript(id: String!): Transcript!
@@ -941,6 +1047,17 @@ enum RecordingStatus {
   transcribing
   uploaded
   uploading
+}
+
+input RegisterSpeechModelInput {
+  """s3://likho-models/... for a fine-tuned model."""
+  artifactUri: String
+  baseModelId: String
+  description: String
+  languages: [String!]
+
+  """<engine>/<name>, e.g. faster-whisper/likho-2026-10."""
+  registryId: String!
 }
 
 input RequestImportInput {
@@ -1115,6 +1232,36 @@ input SettingsInput {
   dialer: DialerSettingsInput
 }
 
+"""A speech model the transcription service can load."""
+type SpeechModel {
+  """Where its weights are; empty for an engine’s own published sizes."""
+  artifactUri: String!
+
+  """The model this one was fine-tuned from, if any."""
+  baseModelId: String!
+  createdAt: DateTime
+  description: String!
+  engine: String!
+  id: String!
+
+  """True for the model new transcriptions use."""
+  isDefault: Boolean!
+
+  """Languages it is meant for; empty = any."""
+  languages: [String!]!
+  latestEvaluationId: String
+
+  """Its newest completed evaluation, if any."""
+  latestScores: ErrorRates
+  name: String!
+
+  """<engine>/<name>, e.g. faster-whisper/turbo."""
+  registryId: String!
+
+  """available or retired."""
+  status: String!
+}
+
 type Spelling {
   """How many transcript lines the spelling was applied to."""
   applied: Int!
@@ -1157,6 +1304,19 @@ type SystemStatus {
 
   """likho-api’s version."""
   version: String!
+}
+
+"""What people’s corrections have given as training data so far."""
+type TrainingStats {
+  """Audio the corrected lines cover."""
+  audioSeconds: Float!
+
+  """Corrected lines (the newest correction of each counts)."""
+  examples: Int!
+  lastExampleAt: DateTime
+  recordings: Int!
+  romanExamples: Int!
+  scriptExamples: Int!
 }
 
 type Transcript {

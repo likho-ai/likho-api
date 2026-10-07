@@ -6,11 +6,17 @@
 import { invalid } from '../common/errors.js';
 
 const MAX_ROWS = 10_000;
+/** 10,000 rows of a term, a language and a note fit in well under this. */
+const MAX_CHARS = 2_000_000;
 const YES = new Set(['true', 'yes', 'y', '1', 'on']);
 const NO = new Set(['false', 'no', 'n', '0', 'off']);
 
 /** Rows of cells. Blank lines are dropped; a byte-order mark is ignored. */
 export function parseCsv(text: string): string[][] {
+  // Checked here as well as at the edges: the loop below runs once per character.
+  if (typeof text !== 'string') throw invalid('The CSV must be text.');
+  if (text.length > MAX_CHARS)
+    throw invalid(`The CSV is too large: at most ${MAX_CHARS} characters at a time.`);
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const rows: string[][] = [];
   let row: string[] = [];

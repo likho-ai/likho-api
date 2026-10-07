@@ -10,6 +10,7 @@ import { DialerService } from '@likho-ai/contracts/dialer/v1/dialer_pb';
 import { InsightsService } from '@likho-ai/contracts/insights/v1/insights_pb';
 import { LanguageService } from '@likho-ai/contracts/language/v1/language_pb';
 import { MediaService } from '@likho-ai/contracts/media/v1/media_pb';
+import { MlService } from '@likho-ai/contracts/ml/v1/ml_pb';
 import { SearchService } from '@likho-ai/contracts/search/v1/search_pb';
 import { TranscriptionService } from '@likho-ai/contracts/transcription/v1/transcription_pb';
 import { LikhoError } from '../common/errors.js';
@@ -22,6 +23,7 @@ export type SearchClient = Client<typeof SearchService>;
 export type InsightsClient = Client<typeof InsightsService>;
 export type AnalyticsClient = Client<typeof AnalyticsService>;
 export type DialerClient = Client<typeof DialerService>;
+export type MlClient = Client<typeof MlService>;
 
 @Injectable()
 export class Clients {
@@ -32,6 +34,7 @@ export class Clients {
   readonly insights: InsightsClient;
   readonly analytics: AnalyticsClient;
   readonly dialer: DialerClient;
+  readonly ml: MlClient;
 
   constructor(@Inject(CONFIG) config: Config) {
     const transport = (address: string) =>
@@ -46,6 +49,7 @@ export class Clients {
     this.insights = createClient(InsightsService, transport(config.INSIGHTS_GRPC_ADDR));
     this.analytics = createClient(AnalyticsService, transport(config.ANALYTICS_GRPC_ADDR));
     this.dialer = createClient(DialerService, transport(config.DIALER_GRPC_ADDR));
+    this.ml = createClient(MlService, transport(config.ML_GRPC_ADDR));
   }
 }
 
