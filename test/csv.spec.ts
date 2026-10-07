@@ -51,6 +51,8 @@ describe('CSV', () => {
     expect(() => parseGlossaryCsv('language,note\nhi,x')).toThrow('"term" is missing');
     expect(() => parseGlossaryCsv('term,enabled\nx,maybe')).toThrow('Line 2: enabled must be true or false');
     expect(() => parseGlossaryCsv('term,note\n,x')).toThrow('Line 2: the term is empty');
+    expect(() => parseCsv('x'.repeat(2_000_001))).toThrow('too large');
+    expect(() => parseCsv({ length: 1e12 } as unknown as string)).toThrow('must be text');
     expect(() => parseSpellingsCsv('source,target\nनीम,')).toThrow('Line 2: both the source and the target');
     expect(() => parseSpellingsCsv('source\nनीम')).toThrow('"target" is missing');
   });
