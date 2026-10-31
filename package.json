@@ -46,7 +46,7 @@
     "graphql": "^16.11.0",
     "ioredis": "^6.0.0",
     "nats": "^2.29.3",
-    "nodemailer": "10.0.14",
+    "nodemailer": "10.1.4",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
